@@ -1,1 +1,0 @@
-# Gestao-controle-GERED
