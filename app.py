@@ -1,6 +1,7 @@
 import os
 import urllib.parse
 import io
+import textwrap
 from datetime import datetime, timedelta
 from flask import Flask, render_template_string, request, redirect, url_for, send_file
 from flask_sqlalchemy import SQLAlchemy
@@ -422,7 +423,7 @@ def atualizar(id):
         demanda.data_conclusao = None
     
     passos_marcados = request.form.getlist('checklist_passos[]')
-    ids_marcados = [int(i) for i in pasos_marcados]
+    ids_marcados = [int(i) for i in passos_marcados]
     
     for chk in demanda.checklists:
         chk.concluido = chk.id in ids_marcados
@@ -460,7 +461,8 @@ def gerar_pdf_ata(id):
             return str(texto).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.set_font("helvetica", style="B", size=16)
-        pdf.cell(0, 10, limpa_texto(f"Ata de Reuniao: {ata.assunto}"), new_x="LMARGIN", new_y="NEXT", align="C")
+        # multi_cell no título para garantir que caiba na folha
+        pdf.multi_cell(0, 10, limpa_texto(f"Ata de Reunião: {ata.assunto}"), align="C")
         
         pdf.set_font("helvetica", style="I", size=10)
         pdf.cell(0, 10, limpa_texto(f"Data: {ata.data_criacao.strftime('%d/%m/%Y')}"), new_x="LMARGIN", new_y="NEXT", align="C")
@@ -476,7 +478,11 @@ def gerar_pdf_ata(id):
         for linha in ata.topicos.split('\n'):
             linha_limpa = linha.strip()
             if linha_limpa:
-                pdf.multi_cell(0, 8, limpa_texto(f"{contador}. {linha_limpa}"))
+                texto_final = limpa_texto(f"{contador}. {linha_limpa}")
+                # O CÓDIGO SALVA-VIDAS: textwrap cortando qualquer palavra gigante na marra
+                linhas_quebradas = textwrap.wrap(texto_final, width=90, break_long_words=True)
+                for pedaco in linhas_quebradas:
+                    pdf.multi_cell(0, 8, pedaco)
                 contador += 1
                 
         pdf_bytes = bytes(pdf.output())
