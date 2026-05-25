@@ -53,39 +53,39 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# 3. CSS GLOBAL (ESTILO MOBILE) E COMPONENTES
+# 3. CSS GLOBAL E DESIGN MOBILE (APP STYLE)
 # ==========================================
 ESTILO_APP = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-    body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-top: 60px; padding-bottom: 90px; }
+    body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-top: 65px; padding-bottom: 85px; }
     
-    /* Topbar */
-    .app-header { position: fixed; top: 0; left: 0; right: 0; background: #ffffff; height: 60px; display: flex; align-items: center; justify-content: center; z-index: 1030; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700; font-size: 1.2rem; color: #1d1d1f; }
+    /* Header Fixo superior */
+    .app-header { position: fixed; top: 0; left: 0; right: 0; background: #ffffff; height: 60px; display: flex; align-items: center; justify-content: center; z-index: 1030; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700; font-size: 1.15rem; color: #1d1d1f; }
     
-    /* Bottom Nav */
+    /* Menu Fixo Inferior */
     .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; height: 65px; display: flex; justify-content: space-around; align-items: center; z-index: 1030; box-shadow: 0 -2px 10px rgba(0,0,0,0.04); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid #f1f1f1; }
     .nav-item { text-decoration: none; color: #8e8e93; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; flex: 1; font-weight: 500; }
     .nav-item.active { color: #007aff; }
-    .nav-icon { font-size: 1.4rem; margin-bottom: 2px; }
+    .nav-icon { font-size: 1.35rem; margin-bottom: 2px; }
     
-    /* Container Limitador (Para ficar bonito se abrir no PC tbm) */
+    /* Container Limitador */
     .container-app { max-width: 600px; margin: auto; padding: 0 15px; }
     
-    /* Cards Mobile */
-    .card-app { background: #fff; border-radius: 16px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px; overflow: hidden; }
-    .card-app-header { padding: 15px; border-bottom: 1px solid #f1f1f1; }
+    /* Cards Arredondados Mobile */
+    .card-app { background: #fff; border-radius: 16px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 14px; overflow: hidden; }
+    .card-app-header { padding: 15px; border-bottom: 1px solid #f8f9fa; cursor: pointer; }
     
-    /* Botão Flutuante (FAB) */
-    .fab { position: fixed; bottom: 85px; right: 20px; background: #007aff; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 4px 12px rgba(0,122,255,0.4); text-decoration: none; z-index: 1020; transition: transform 0.2s; }
+    /* Botão Flutuante Direito (FAB) */
+    .fab { position: fixed; bottom: 85px; right: 20px; background: #007aff; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 12px rgba(0,122,255,0.35); text-decoration: none; z-index: 1020; }
     .fab:active { transform: scale(0.95); color: white; }
     
-    /* Elementos de Formulário */
-    .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; }
-    .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.2rem rgba(0,122,255,0.15); }
-    .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; }
+    /* Form Customizations */
+    .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; font-size: 0.95rem; }
+    .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.25rem rgba(0,122,255,0.1); }
+    .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; font-size: 0.95rem; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 """
@@ -104,14 +104,14 @@ MENU_INFERIOR = """
 """
 
 # ==========================================
-# 4. TELAS DO SISTEMA
+# 4. TEMPLATES HTML COMPATÍVEIS
 # ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>JPMS | Demandas</title>
+    <title>JPMS System | Demandas</title>
     """ + ESTILO_APP + """
 </head>
 <body>
@@ -119,7 +119,7 @@ TELA_PRINCIPAL = """
     
     <div class="container-app mt-3">
         <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-4 shadow-sm">
-            <i class="bi bi-whatsapp"></i> Enviar Resumo Zap
+            <i class="bi bi-whatsapp"></i> Enviar Resumo no WhatsApp
         </a>
         
         <div class="accordion" id="accordionDemandas">
@@ -141,9 +141,9 @@ TELA_PRINCIPAL = """
                             {% elif demanda.prioridade == 'Alto' %}<span class="badge bg-warning text-dark">🟡 Alto</span>
                             {% elif demanda.prioridade == 'Médio' %}<span class="badge bg-info text-dark">🔵 Médio</span>
                             {% else %}<span class="badge bg-secondary">🟢 Mínimo</span>{% endif %}
-                            <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.descricao[:50] }}...</h6>
+                            <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.descricao[:55] }}...</h6>
                         </div>
-                        <div class="text-end" style="min-width: 90px;">
+                        <div class="text-end" style="min-width: 95px;">
                             {% if demanda.status == 'Finalizado' %}<span class="badge bg-success d-block mb-1">Finalizado</span>
                             {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary d-block mb-1">Iniciado</span>
                             {% else %}<span class="badge bg-secondary d-block mb-1">Pendente</span>{% endif %}
@@ -153,9 +153,9 @@ TELA_PRINCIPAL = """
                 </div>
                 
                 <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
-                    <div class="card-body p-3">
+                    <div class="card-body p-3 border-top">
                         <form action="/atualizar/{{ demanda.id }}" method="POST">
-                            <label class="form-label fw-bold text-secondary small">Atualizar Status</label>
+                            <label class="form-label fw-bold text-secondary small">Status da Demanda</label>
                             <select name="status" class="form-select form-select-sm mb-3 border-primary shadow-sm">
                                 <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
                                 <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>🚀 Iniciado</option>
@@ -163,7 +163,7 @@ TELA_PRINCIPAL = """
                             </select>
                             
                             <div class="bg-light p-3 rounded mb-3">
-                                <small class="text-muted d-block mb-2"><strong>Descrição:</strong> {{ demanda.descricao }}</small>
+                                <small class="text-dark d-block"><strong>Descrição Completa:</strong> {{ demanda.descricao }}</small>
                             </div>
                             
                             <h6 class="fw-bold text-secondary mb-2 small">Progresso do Checklist</h6>
@@ -171,20 +171,20 @@ TELA_PRINCIPAL = """
                                 <div class="progress flex-grow-1 me-2 rounded-pill" style="height: 10px;">
                                     <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-primary{% endif %} rounded-pill" style="width: {{ percentual }}%;"></div>
                                 </div>
-                                <small class="fw-bold text-muted">{{ percentual }}%</small>
+                                <small class="fw-bold text-muted" style="font-size: 0.8rem;">{{ percentual }}%</small>
                             </div>
 
                             <div class="mb-4">
                                 {% for chk in demanda.checklists %}
-                                <div class="form-check custom-checkbox mb-2">
-                                    <input class="form-check-input" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.2); margin-right: 8px;">
-                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.15); margin-right: 6px;">
+                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
                                 </div>
                                 {% else %}
-                                <p class="text-muted small">Nenhum passo.</p>
+                                <p class="text-muted small">Nenhuma subetapa cadastrada.</p>
                                 {% endfor %}
                             </div>
-                            <button type="submit" class="btn btn-primary btn-app w-100">Salvar Alterações</button>
+                            <button type="submit" class="btn btn-primary btn-app w-100">💾 Salvar Alterações</button>
                         </form>
                     </div>
                 </div>
@@ -192,14 +192,13 @@ TELA_PRINCIPAL = """
             {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-inbox fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma demanda ativa! 🎉</p>
+                <p class="text-muted mt-2">Nenhuma demanda pendente por aqui! 🚀</p>
             </div>
             {% endfor %}
         </div>
     </div>
     
-    <a href="/nova_demanda" class="fab"><i class="bi bi-plus"></i></a>
-    
+    <a href="/nova_demanda" class="fab"><i class="bi bi-plus-lg"></i></a>
     """ + MENU_INFERIOR + """
 </body>
 </html>
@@ -215,7 +214,7 @@ TELA_NOVA_DEMANDA = """
 </head>
 <body>
     <div class="app-header">
-        <a href="/" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>
+        <a href="/" class="position-absolute start-0 ms-3 text-dark fs-3" style="line-height:1;"><i class="bi bi-arrow-left-short"></i></a>
         Nova Demanda
     </div>
     
@@ -243,32 +242,32 @@ TELA_NOVA_DEMANDA = """
             </div>
             
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Descrição</label>
-                <textarea name="descricao" class="form-control" rows="3" placeholder="O que precisa ser feito..." required></textarea>
+                <label class="form-label fw-bold text-secondary small">Descrição do Trabalho</label>
+                <textarea name="descricao" class="form-control" rows="3" placeholder="Insira o escopo ou resumo..." required></textarea>
             </div>
             
             <div class="row mb-4">
                 <div class="col-6">
-                    <label class="form-label fw-bold text-secondary small">Início</label>
+                    <label class="form-label fw-bold text-secondary small">Data de Início</label>
                     <input type="date" name="data_inicio" class="form-control">
                 </div>
                 <div class="col-6">
-                    <label class="form-label fw-bold text-danger small">Previsão</label>
-                    <input type="date" name="data_prevista" class="form-control" required>
+                    <label class="form-label fw-bold text-danger small">Previsão Fim</label>
+                    <input type="date" name="data_prevista" class="form-control border-danger" required>
                 </div>
             </div>
             
-            <div class="card-app bg-white p-3 mb-4">
+            <div class="card-app bg-white p-3 mb-4 border">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0 fw-bold">Checklist</h6>
+                    <h6 class="mb-0 fw-bold text-secondary">Checklist Auxiliar</h6>
                     <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="adicionarPasso()">+ Item</button>
                 </div>
                 <div id="checklist-container">
-                    <input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Descreva a etapa...">
+                    <input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Ex: Tratar planilha no Excel...">
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-app w-100 mb-3">Salvar Demanda</button>
+            <button type="submit" class="btn btn-primary btn-app w-100 mb-4">Salvar Registro</button>
         </form>
     </div>
     <script>
@@ -288,46 +287,51 @@ TELA_ATAS = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>JPMS | Atas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPMS System | Atas</title>
     """ + ESTILO_APP + """
 </head>
 <body>
-    <div class="app-header">📁 Atas de Reunião</div>
+    <div class="app-header">📁 Histórico de Atas</div>
     
     <div class="container-app mt-3">
         <form method="GET" action="/atas" class="mb-4">
-            <div class="input-group">
-                <input type="text" name="busca" class="form-control border-end-0" placeholder="Pesquisar atas..." value="{{ busca }}">
-                <button class="btn btn-primary border-start-0" type="submit"><i class="bi bi-search"></i></button>
+            <div class="input-group shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                <input type="text" name="busca" class="form-control border-0" placeholder="🔍 Digite o assunto para pesquisar..." value="{{ busca }}">
+                <button class="btn btn-primary px-3" type="submit">Buscar</button>
             </div>
+            {% if busca %}
+                <div class="text-end mt-1"><a href="/atas" class="text-decoration-none small text-secondary">❌ Limpar filtro</a></div>
+            {% endif %}
         </form>
 
         <div class="row">
             {% for ata in atas %}
             <div class="col-12">
                 <div class="card-app p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <h6 class="fw-bold text-dark text-truncate mb-1" style="max-width: 70%;">{{ ata.assunto }}</h6>
-                        <small class="text-muted" style="font-size: 0.7rem;">{{ ata.data_criacao.strftime('%d/%m/%y') }}</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h6 class="fw-bold text-dark text-truncate m-0" style="max-width: 70%;">{{ ata.assunto }}</h6>
+                        <span class="badge bg-light text-dark border font-monospace" style="font-size: 0.75rem;">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</span>
                     </div>
-                    <p class="text-muted small mt-1 mb-3" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    <p class="text-muted small mb-3" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap;">
                         {{ ata.topicos }}
                     </p>
+                    
                     <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold">
-                        <i class="bi bi-file-earmark-pdf"></i> Baixar PDF
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Baixar Arquivo PDF
                     </a>
                 </div>
             </div>
             {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-journal-x fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma ata registrada.</p>
+                <p class="text-muted mt-2">Nenhuma ata localizada na busca.</p>
             </div>
             {% endfor %}
         </div>
     </div>
     
-    <a href="/nova_ata" class="fab"><i class="bi bi-plus"></i></a>
+    <a href="/nova_ata" class="fab" style="background: #007aff;"><i class="bi bi-plus-lg"></i></a>
     """ + MENU_INFERIOR + """
 </body>
 </html>
@@ -338,27 +342,27 @@ TELA_NOVA_ATA = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Nova Ata</title>
+    <title>Nova Ata de Reunião</title>
     """ + ESTILO_APP + """
 </head>
 <body>
     <div class="app-header">
-        <a href="/atas" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>
-        Nova Ata
+        <a href="/atas" class="position-absolute start-0 ms-3 text-dark fs-3" style="line-height:1;"><i class="bi bi-arrow-left-short"></i></a>
+        Gerar Nova Ata
     </div>
     
     <div class="container-app mt-3">
         <form method="POST">
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Assunto / Título</label>
-                <input type="text" name="assunto" class="form-control" placeholder="Reunião de alinhamento..." required>
+                <label class="form-label fw-bold text-secondary small">Título / Assunto da Pauta</label>
+                <input type="text" name="assunto" class="form-control" placeholder="Ex: Alinhamento de Demandas ANS" required>
             </div>
             <div class="mb-4">
-                <label class="form-label fw-bold text-secondary small">Tópicos Discutidos</label>
-                <div class="form-text text-muted mb-2 small">Dê 'Enter' para cada novo tópico.</div>
-                <textarea name="topicos" class="form-control" rows="8" placeholder="O que foi decidido..." required></textarea>
+                <label class="form-label fw-bold text-secondary small">Pontos Acordados e Tópicos</label>
+                <div class="form-text text-muted mb-2 small">Aperte 'Enter' para criar cada tópico em linhas separadas.</div>
+                <textarea name="topicos" class="form-control" rows="8" placeholder="Digite as deliberações aqui..." required></textarea>
             </div>
-            <button type="submit" class="btn btn-info text-white btn-app w-100">Salvar e Gerar PDF</button>
+            <button type="submit" class="btn btn-info text-white btn-app w-100 mb-4 shadow">💾 Salvar e Criar PDF</button>
         </form>
     </div>
 </body>
@@ -366,7 +370,7 @@ TELA_NOVA_ATA = """
 """
 
 # ==========================================
-# 5. ROTAS E LÓGICA DO SISTEMA
+# 5. ROTAS E INTERAÇÕES DO BACKEND
 # ==========================================
 @app.route('/')
 def index():
@@ -418,7 +422,7 @@ def atualizar(id):
         demanda.data_conclusao = None
     
     passos_marcados = request.form.getlist('checklist_passos[]')
-    ids_marcados = [int(i) for i in passos_marcados]
+    ids_marcados = [int(i) for i in pasos_marcados]
     
     for chk in demanda.checklists:
         chk.concluido = chk.id in ids_marcados
@@ -447,27 +451,44 @@ def nova_ata():
 @app.route('/gerar_pdf_ata/<int:id>')
 def gerar_pdf_ata(id):
     ata = AtaReuniao.query.get_or_404(id)
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("helvetica", style="B", size=16)
-    pdf.cell(0, 10, f"Ata de Reuniao: {ata.assunto}", new_x="LMARGIN", new_y="NEXT", align="C")
-    pdf.set_font("helvetica", style="I", size=10)
-    pdf.cell(0, 10, f"Data: {ata.data_criacao.strftime('%d/%m/%Y')}", new_x="LMARGIN", new_y="NEXT", align="C")
-    pdf.ln(10)
-    pdf.set_font("helvetica", style="B", size=12)
-    pdf.cell(0, 10, "Topicos Discutidos:", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    pdf.set_font("helvetica", size=11)
-    
-    contador = 1
-    for linha in ata.topicos.split('\n'):
-        linha_limpa = linha.strip()
-        if linha_limpa:
-            pdf.multi_cell(0, 8, f"{contador}. {linha_limpa}")
-            contador += 1
-            
-    pdf_bytes = pdf.output()
-    return send_file(io.BytesIO(pdf_bytes), as_attachment=True, download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", mimetype='application/pdf')
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Filtro de codificação robusto contra quebras de caracteres especiais/emojis
+        def limpa_texto(texto):
+            return str(texto).encode('latin-1', 'replace').decode('latin-1')
+        
+        pdf.set_font("helvetica", style="B", size=16)
+        pdf.cell(0, 10, limpa_texto(f"Ata de Reuniao: {ata.assunto}"), new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        pdf.set_font("helvetica", style="I", size=10)
+        pdf.cell(0, 10, limpa_texto(f"Data: {ata.data_criacao.strftime('%d/%m/%Y')}"), new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(10)
+        
+        pdf.set_font("helvetica", style="B", size=12)
+        pdf.cell(0, 10, "Topicos Discutidos:", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
+        
+        pdf.set_font("helvetica", size=11)
+        
+        contador = 1
+        for linha in ata.topicos.split('\n'):
+            linha_limpa = linha.strip()
+            if linha_limpa:
+                pdf.multi_cell(0, 8, limpa_texto(f"{contador}. {linha_limpa}"))
+                contador += 1
+                
+        pdf_bytes = bytes(pdf.output())
+        
+        return send_file(
+            io.BytesIO(pdf_bytes), 
+            as_attachment=True, 
+            download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", 
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return f"<h3>Erro interno ao renderizar PDF:</h3><p>{str(e)}</p>", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
