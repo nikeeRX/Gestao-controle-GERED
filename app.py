@@ -37,6 +37,12 @@ class Checklist(db.Model):
     concluido = db.Column(db.Boolean, default=False)
 
 # ==========================================
+# CRIA AS TABELAS (A MÁGICA TÁ AQUI)
+# ==========================================
+with app.app_context():
+    db.create_all()
+
+# ==========================================
 # ROTAS E LÓGICA DO SISTEMA
 # ==========================================
 @app.route('/')
@@ -90,7 +96,5 @@ def nova_demanda():
     return render_template('nova_demanda.html')
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
