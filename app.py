@@ -49,47 +49,78 @@ class AtaReuniao(db.Model):
     data_criacao = db.Column(db.Date, default=datetime.utcnow().date)
     topicos = db.Column(db.Text, nullable=False)
 
-# ==========================================
-# 3. CRIAÇÃO DO BANCO (LIMPO)
-# ==========================================
 with app.app_context():
     db.create_all()
 
 # ==========================================
-# 4. TELAS DO SISTEMA
+# 3. CSS GLOBAL (ESTILO MOBILE) E COMPONENTES
 # ==========================================
-MENU_TOPO = """
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-    <div class="container" style="max-width: 1000px;">
-        <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-        <div class="d-flex">
-            <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-            <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-        </div>
-    </div>
-</nav>
+ESTILO_APP = """
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding-top: 60px; padding-bottom: 90px; }
+    
+    /* Topbar */
+    .app-header { position: fixed; top: 0; left: 0; right: 0; background: #ffffff; height: 60px; display: flex; align-items: center; justify-content: center; z-index: 1030; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700; font-size: 1.2rem; color: #1d1d1f; }
+    
+    /* Bottom Nav */
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; height: 65px; display: flex; justify-content: space-around; align-items: center; z-index: 1030; box-shadow: 0 -2px 10px rgba(0,0,0,0.04); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid #f1f1f1; }
+    .nav-item { text-decoration: none; color: #8e8e93; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; flex: 1; font-weight: 500; }
+    .nav-item.active { color: #007aff; }
+    .nav-icon { font-size: 1.4rem; margin-bottom: 2px; }
+    
+    /* Container Limitador (Para ficar bonito se abrir no PC tbm) */
+    .container-app { max-width: 600px; margin: auto; padding: 0 15px; }
+    
+    /* Cards Mobile */
+    .card-app { background: #fff; border-radius: 16px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 15px; overflow: hidden; }
+    .card-app-header { padding: 15px; border-bottom: 1px solid #f1f1f1; }
+    
+    /* Botão Flutuante (FAB) */
+    .fab { position: fixed; bottom: 85px; right: 20px; background: #007aff; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 4px 12px rgba(0,122,255,0.4); text-decoration: none; z-index: 1020; transition: transform 0.2s; }
+    .fab:active { transform: scale(0.95); color: white; }
+    
+    /* Elementos de Formulário */
+    .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; }
+    .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.2rem rgba(0,122,255,0.15); }
+    .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 """
 
+MENU_INFERIOR = """
+<div class="bottom-nav">
+    <a href="/" class="nav-item {% if page == 'demandas' %}active{% endif %}">
+        <i class="bi bi-card-checklist nav-icon"></i>
+        <span>Demandas</span>
+    </a>
+    <a href="/atas" class="nav-item {% if page == 'atas' %}active{% endif %}">
+        <i class="bi bi-journal-text nav-icon"></i>
+        <span>Atas</span>
+    </a>
+</div>
+"""
+
+# ==========================================
+# 4. TELAS DO SISTEMA
+# ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demandas | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <title>JPMS | Demandas</title>
+    """ + ESTILO_APP + """
 </head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 1000px;">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-            <h3 class="mb-2 mb-md-0 text-secondary">Acompanhamento de Demandas</h3>
-            <div>
-                <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success fw-bold btn-sm me-1">📱 Resumo Zap</a>
-                <a href="/nova_demanda" class="btn btn-primary fw-bold btn-sm">+ Nova Demanda</a>
-            </div>
-        </div>
+<body>
+    <div class="app-header">🚀 JPMS System</div>
+    
+    <div class="container-app mt-3">
+        <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-4 shadow-sm">
+            <i class="bi bi-whatsapp"></i> Enviar Resumo Zap
+        </a>
         
         <div class="accordion" id="accordionDemandas">
             {% for demanda in demandas %}
@@ -97,91 +128,79 @@ TELA_PRINCIPAL = """
             {% set total_chk = demanda.checklists|length %}
             {% set ns = namespace(concluidos=0) %}
             {% for chk in demanda.checklists %}
-                {% if chk.concluido %}
-                    {% set ns.concluidos = ns.concluidos + 1 %}
-                {% endif %}
+                {% if chk.concluido %}{% set ns.concluidos = ns.concluidos + 1 %}{% endif %}
             {% endfor %}
             {% set percentual = (ns.concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
 
-            <div class="accordion-item mb-3 border-0 shadow-sm rounded">
-                <h2 class="accordion-header" id="heading{{ demanda.id }}">
-                    <button class="accordion-button collapsed rounded" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ demanda.id }}">
-                        <div class="d-flex align-items-center w-100 justify-content-between me-3 text-wrap">
-                            <div>
-                                <span class="badge bg-dark me-1">{{ demanda.area }}</span>
-                                {% if demanda.prioridade == 'Extremo' %}
-                                    <span class="badge bg-danger">🔴 Extremo</span>
-                                {% elif demanda.prioridade == 'Alto' %}
-                                    <span class="badge bg-warning text-dark">🟡 Alto</span>
-                                {% elif demanda.prioridade == 'Médio' %}
-                                    <span class="badge bg-info text-dark">🔵 Médio</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">🟢 Mínimo</span>
-                                {% endif %}
-                                <div class="mt-1 text-dark fw-semibold" style="font-size: 0.95rem;">{{ demanda.descricao[:70] }}...</div>
-                            </div>
-                            <div class="text-end mt-2 mt-sm-0" style="min-width: 125px;">
-                                {% if demanda.status == 'Finalizado' %}
-                                    <span class="badge bg-success d-block mb-1">Finalizado</span>
-                                {% elif demanda.status == 'Iniciado' %}
-                                    <span class="badge bg-primary d-block mb-1">Iniciado</span>
-                                {% else %}
-                                    <span class="badge bg-secondary d-block mb-1">Pendente</span>
-                                {% endif %}
-                                <small class="text-danger fw-bold d-block">📅 {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
-                            </div>
+            <div class="card-app">
+                <div class="card-app-header" data-bs-toggle="collapse" data-bs-target="#collapse{{ demanda.id }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="me-2">
+                            <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
+                            {% if demanda.prioridade == 'Extremo' %}<span class="badge bg-danger">🔴 Extremo</span>
+                            {% elif demanda.prioridade == 'Alto' %}<span class="badge bg-warning text-dark">🟡 Alto</span>
+                            {% elif demanda.prioridade == 'Médio' %}<span class="badge bg-info text-dark">🔵 Médio</span>
+                            {% else %}<span class="badge bg-secondary">🟢 Mínimo</span>{% endif %}
+                            <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.descricao[:50] }}...</h6>
                         </div>
-                    </button>
-                </h2>
-                <div id="collapse{{ demanda.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionDemandas">
-                    <div class="accordion-body bg-white border-top rounded-bottom">
+                        <div class="text-end" style="min-width: 90px;">
+                            {% if demanda.status == 'Finalizado' %}<span class="badge bg-success d-block mb-1">Finalizado</span>
+                            {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary d-block mb-1">Iniciado</span>
+                            {% else %}<span class="badge bg-secondary d-block mb-1">Pendente</span>{% endif %}
+                            <small class="text-danger fw-bold d-block" style="font-size: 0.7rem;">📅 {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
+                    <div class="card-body p-3">
                         <form action="/atualizar/{{ demanda.id }}" method="POST">
-                            <div class="row mb-3">
-                                <div class="col-md-4 border-end mb-3 mb-md-0">
-                                    <label class="form-label fw-bold text-secondary">Editar Status</label>
-                                    <select name="status" class="form-select form-select-sm mb-3 border-primary">
-                                        <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>Pendente</option>
-                                        <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>Iniciado</option>
-                                        <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>Finalizado</option>
-                                    </select>
-                                    <p class="mb-1 small"><strong>Solicitado:</strong> {{ demanda.data_solicitacao.strftime('%d/%m/%Y') }}</p>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label fw-bold text-secondary">Descrição Detalhada</label>
-                                    <p class="bg-light p-2 rounded small text-dark" style="white-space: pre-wrap;">{{ demanda.descricao }}</p>
-                                </div>
+                            <label class="form-label fw-bold text-secondary small">Atualizar Status</label>
+                            <select name="status" class="form-select form-select-sm mb-3 border-primary shadow-sm">
+                                <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
+                                <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>🚀 Iniciado</option>
+                                <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
+                            </select>
+                            
+                            <div class="bg-light p-3 rounded mb-3">
+                                <small class="text-muted d-block mb-2"><strong>Descrição:</strong> {{ demanda.descricao }}</small>
                             </div>
                             
-                            <h6 class="fw-bold text-secondary mb-1">Checklist de Tarefas</h6>
+                            <h6 class="fw-bold text-secondary mb-2 small">Progresso do Checklist</h6>
                             <div class="d-flex align-items-center mb-3">
-                                <div class="progress flex-grow-1 me-2" style="height: 12px;">
-                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-info{% endif %}" role="progressbar" style="width: {{ percentual }}%;"></div>
+                                <div class="progress flex-grow-1 me-2 rounded-pill" style="height: 10px;">
+                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-primary{% endif %} rounded-pill" style="width: {{ percentual }}%;"></div>
                                 </div>
                                 <small class="fw-bold text-muted">{{ percentual }}%</small>
                             </div>
 
-                            <div class="mb-3 bg-light p-3 rounded">
+                            <div class="mb-4">
                                 {% for chk in demanda.checklists %}
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input border-secondary" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %}>
-                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
+                                <div class="form-check custom-checkbox mb-2">
+                                    <input class="form-check-input" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.2); margin-right: 8px;">
+                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
                                 </div>
                                 {% else %}
-                                <p class="text-muted small mb-0">Nenhum passo cadastrado.</p>
+                                <p class="text-muted small">Nenhum passo.</p>
                                 {% endfor %}
                             </div>
-                            <div class="d-flex justify-content-end">
-                                <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">💾 Salvar Alterações</button>
-                            </div>
+                            <button type="submit" class="btn btn-primary btn-app w-100">Salvar Alterações</button>
                         </form>
                     </div>
                 </div>
             </div>
             {% else %}
-            <div class="text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Sem demandas ativas! 🚀</p></div>
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-2">Nenhuma demanda ativa! 🎉</p>
+            </div>
             {% endfor %}
         </div>
     </div>
+    
+    <a href="/nova_demanda" class="fab"><i class="bi bi-plus"></i></a>
+    
+    """ + MENU_INFERIOR + """
 </body>
 </html>
 """
@@ -191,66 +210,66 @@ TELA_NOVA_DEMANDA = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Demanda | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Nova Demanda</title>
+    """ + ESTILO_APP + """
 </head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 800px;">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="row mb-3">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <label class="form-label fw-bold">Área Responsável</label>
-                            <select name="area" class="form-select" required>
-                                <option value="CODER">CODER</option>
-                                <option value="COCAP">COCAP</option>
-                                <option value="CONEC">CONEC</option>
-                                <option value="GERED">GERED</option>
-                                <option value="EXTERNO">EXTERNO</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Prioridade</label>
-                            <select name="prioridade" class="form-select" required>
-                                <option value="Mínimo">Mínimo</option>
-                                <option value="Médio" selected>Médio</option>
-                                <option value="Alto">Alto</option>
-                                <option value="Extremo">Extremo</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Descrição da Demanda</label>
-                        <textarea name="descricao" class="form-control" rows="3" required></textarea>
-                    </div>
-                    <div class="row mb-4">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <label class="form-label fw-bold">Data de Início</label>
-                            <input type="date" name="data_inicio" class="form-control">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-danger">Data Prevista para Conclusão</label>
-                            <input type="date" name="data_prevista" class="form-control border-danger" required>
-                        </div>
-                    </div>
-                    <div class="bg-light p-3 rounded border">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Checklist</h5>
-                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="adicionarPasso()">+ Passo</button>
-                        </div>
-                        <div id="checklist-container"><input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Etapa 1..."></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="/" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-success px-5 fw-bold">Salvar</button>
-                    </div>
-                </form>
+<body>
+    <div class="app-header">
+        <a href="/" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>
+        Nova Demanda
+    </div>
+    
+    <div class="container-app mt-3">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary small">Área Responsável</label>
+                <select name="area" class="form-select" required>
+                    <option value="CODER">CODER</option>
+                    <option value="COCAP">COCAP</option>
+                    <option value="CONEC">CONEC</option>
+                    <option value="GERED">GERED</option>
+                    <option value="EXTERNO">EXTERNO</option>
+                </select>
             </div>
-        </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary small">Prioridade</label>
+                <select name="prioridade" class="form-select" required>
+                    <option value="Mínimo">🟢 Mínimo</option>
+                    <option value="Médio" selected>🔵 Médio</option>
+                    <option value="Alto">🟡 Alto</option>
+                    <option value="Extremo">🔴 Extremo</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary small">Descrição</label>
+                <textarea name="descricao" class="form-control" rows="3" placeholder="O que precisa ser feito..." required></textarea>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-6">
+                    <label class="form-label fw-bold text-secondary small">Início</label>
+                    <input type="date" name="data_inicio" class="form-control">
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold text-danger small">Previsão</label>
+                    <input type="date" name="data_prevista" class="form-control" required>
+                </div>
+            </div>
+            
+            <div class="card-app bg-white p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0 fw-bold">Checklist</h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="adicionarPasso()">+ Item</button>
+                </div>
+                <div id="checklist-container">
+                    <input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Descreva a etapa...">
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-app w-100 mb-3">Salvar Demanda</button>
+        </form>
     </div>
     <script>
         function adicionarPasso() {
@@ -269,48 +288,47 @@ TELA_ATAS = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atas | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>JPMS | Atas</title>
+    """ + ESTILO_APP + """
 </head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 1000px;">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-            <h3 class="mb-2 mb-md-0 text-secondary">📁 Atas de Reunião</h3>
-            <a href="/nova_ata" class="btn btn-info text-white fw-bold btn-sm">+ Criar Ata</a>
-        </div>
-
+<body>
+    <div class="app-header">📁 Atas de Reunião</div>
+    
+    <div class="container-app mt-3">
         <form method="GET" action="/atas" class="mb-4">
-            <div class="input-group shadow-sm">
-                <input type="text" name="busca" class="form-control" placeholder="Pesquisar atas..." value="{{ busca }}">
-                <button class="btn btn-dark" type="submit">🔍 Buscar</button>
+            <div class="input-group">
+                <input type="text" name="busca" class="form-control border-end-0" placeholder="Pesquisar atas..." value="{{ busca }}">
+                <button class="btn btn-primary border-start-0" type="submit"><i class="bi bi-search"></i></button>
             </div>
         </form>
 
         <div class="row">
             {% for ata in atas %}
-            <div class="col-md-6 mb-3">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-body d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h5 class="card-title text-dark fw-bold text-truncate" style="max-width: 75%;">{{ ata.assunto }}</h5>
-                                <small class="text-muted">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</small>
-                            </div>
-                            <p class="card-text text-muted small mt-2" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                                {{ ata.topicos }}
-                            </p>
-                        </div>
-                        <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-sm btn-outline-danger fw-bold mt-3 align-self-start">📄 Baixar PDF</a>
+            <div class="col-12">
+                <div class="card-app p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <h6 class="fw-bold text-dark text-truncate mb-1" style="max-width: 70%;">{{ ata.assunto }}</h6>
+                        <small class="text-muted" style="font-size: 0.7rem;">{{ ata.data_criacao.strftime('%d/%m/%y') }}</small>
                     </div>
+                    <p class="text-muted small mt-1 mb-3" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        {{ ata.topicos }}
+                    </p>
+                    <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold">
+                        <i class="bi bi-file-earmark-pdf"></i> Baixar PDF
+                    </a>
                 </div>
             </div>
             {% else %}
-            <div class="col-12 text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Nenhuma ata encontrada.</p></div>
+            <div class="text-center py-5">
+                <i class="bi bi-journal-x fs-1 text-muted"></i>
+                <p class="text-muted mt-2">Nenhuma ata registrada.</p>
+            </div>
             {% endfor %}
         </div>
     </div>
+    
+    <a href="/nova_ata" class="fab"><i class="bi bi-plus"></i></a>
+    """ + MENU_INFERIOR + """
 </body>
 </html>
 """
@@ -320,34 +338,28 @@ TELA_NOVA_ATA = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Ata | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Nova Ata</title>
+    """ + ESTILO_APP + """
 </head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 800px;">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-info text-white p-3">
-                <h4 class="mb-0">Cadastrar Ata de Reunião</h4>
+<body>
+    <div class="app-header">
+        <a href="/atas" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>
+        Nova Ata
+    </div>
+    
+    <div class="container-app mt-3">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary small">Assunto / Título</label>
+                <input type="text" name="assunto" class="form-control" placeholder="Reunião de alinhamento..." required>
             </div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Assunto / Título da Reunião</label>
-                        <input type="text" name="assunto" class="form-control" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Tópicos Discutidos (Um por linha)</label>
-                        <textarea name="topicos" class="form-control" rows="8" placeholder="Pressione Enter para cada novo tópico..." required></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <a href="/atas" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-info text-white fw-bold px-5">Salvar e Gerar PDF</button>
-                    </div>
-                </form>
+            <div class="mb-4">
+                <label class="form-label fw-bold text-secondary small">Tópicos Discutidos</label>
+                <div class="form-text text-muted mb-2 small">Dê 'Enter' para cada novo tópico.</div>
+                <textarea name="topicos" class="form-control" rows="8" placeholder="O que foi decidido..." required></textarea>
             </div>
-        </div>
+            <button type="submit" class="btn btn-info text-white btn-app w-100">Salvar e Gerar PDF</button>
+        </form>
     </div>
 </body>
 </html>
@@ -374,7 +386,7 @@ def index():
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/?text={texto_codificado}"
     
-    return render_template_string(TELA_PRINCIPAL, demandas=demandas_ativas, link_whatsapp=link_whatsapp)
+    return render_template_string(TELA_PRINCIPAL, demandas=demandas_ativas, link_whatsapp=link_whatsapp, page='demandas')
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
@@ -421,7 +433,7 @@ def lista_atas():
         atas = AtaReuniao.query.filter((AtaReuniao.assunto.ilike(f'%{busca}%')) | (AtaReuniao.topicos.ilike(f'%{busca}%'))).order_by(AtaReuniao.data_criacao.desc()).all()
     else:
         atas = AtaReuniao.query.order_by(AtaReuniao.data_criacao.desc()).all()
-    return render_template_string(TELA_ATAS, atas=atas, busca=busca)
+    return render_template_string(TELA_ATAS, atas=atas, busca=busca, page='atas')
 
 @app.route('/nova_ata', methods=['GET', 'POST'])
 def nova_ata():
