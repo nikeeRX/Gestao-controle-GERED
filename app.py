@@ -27,7 +27,7 @@ class Demanda(db.Model):
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='A Fazer') 
+    status = db.Column(db.String(20), default='Pendente') # Pendente, Iniciado, Finalizado
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
@@ -64,7 +64,7 @@ MENU_TOPO = """
 </nav>
 """
 
-TELA_PRINCIPAL = f"""
+TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -75,90 +75,108 @@ TELA_PRINCIPAL = f"""
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body class="bg-light">
-    {MENU_TOPO}
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
             <h3 class="mb-2 mb-md-0 text-secondary">Acompanhamento de Demandas</h3>
             <div>
-                <a href="{{{{ link_whatsapp }}}}" target="_blank" class="btn btn-success fw-bold btn-sm me-1">📱 Resumo Zap</a>
+                <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success fw-bold btn-sm me-1">📱 Resumo Zap</a>
                 <a href="/nova_demanda" class="btn btn-primary fw-bold btn-sm">+ Nova Demanda</a>
             </div>
         </div>
         
         <div class="accordion" id="accordionDemandas">
-            {{% for demanda in demandas %}}
+            {% for demanda in demandas %}
+            
+            {% set total_chk = demanda.checklists|length %}
+            {% set concluidos = demanda.checklists|selectattr("concluido", "equalto", True)|list|length %}
+            {% set percentual = (concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
+
             <div class="accordion-item mb-3 border-0 shadow-sm rounded">
-                <h2 class="accordion-header" id="heading{{{{ demanda.id }}}}">
-                    <button class="accordion-button collapsed rounded" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{{{ demanda.id }}}}">
+                <h2 class="accordion-header" id="heading{{ demanda.id }}">
+                    <button class="accordion-button collapsed rounded" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ demanda.id }}">
                         <div class="d-flex align-items-center w-100 justify-content-between me-3 text-wrap">
                             <div>
-                                <span class="badge bg-dark me-1">{{{{ demanda.area }}}}</span>
-                                {{% if demanda.prioridade == 'Extremo' %}}
+                                <span class="badge bg-dark me-1">{{ demanda.area }}</span>
+                                {% if demanda.prioridade == 'Extremo' %}
                                     <span class="badge bg-danger">🔴 Extremo</span>
-                                {{% elif demanda.prioridade == 'Alto' %}}
+                                {% elif demanda.prioridade == 'Alto' %}
                                     <span class="badge bg-warning text-dark">🟡 Alto</span>
-                                {{% elif demanda.prioridade == 'Médio' %}}
+                                {% elif demanda.prioridade == 'Médio' %}
                                     <span class="badge bg-info text-dark">🔵 Médio</span>
-                                {{% else %}}
+                                {% else %}
                                     <span class="badge bg-secondary">🟢 Mínimo</span>
-                                {{% endif %}}
-                                <div class="mt-1 text-dark fw-semibold" style="font-size: 0.95rem;">{{{{ demanda.descricao[:70] }}}}...</div>
+                                {% endif %}
+                                <div class="mt-1 text-dark fw-semibold" style="font-size: 0.95rem;">{{ demanda.descricao[:70] }}...</div>
                             </div>
-                            <div class="text-end mt-2 mt-sm-0">
-                                <span class="badge bg-light text-dark border d-block mb-1">{{{{ demanda.status }}}}</span>
-                                <small class="text-danger fw-bold d-block">📅 {{{{ demanda.data_prevista.strftime('%d/%m/%Y') }}}}</small>
+                            <div class="text-end mt-2 mt-sm-0" style="min-width: 120px;">
+                                {% if demanda.status == 'Finalizado' %}
+                                    <span class="badge bg-success d-block mb-1">Finalizado</span>
+                                {% elif demanda.status == 'Iniciado' %}
+                                    <span class="badge bg-primary d-block mb-1">Iniciado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary d-block mb-1">Pendente</span>
+                                {% endif %}
+                                <small class="text-danger fw-bold d-block">📅 {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
                             </div>
                         </div>
                     </button>
                 </h2>
-                <div id="collapse{{{{ demanda.id }}}}" class="accordion-collapse collapse" data-bs-parent="#accordionDemandas">
+                <div id="collapse{{ demanda.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionDemandas">
                     <div class="accordion-body bg-white border-top rounded-bottom">
-                        <form action="/atualizar/{{{{ demanda.id }}}}" method="POST">
+                        <form action="/atualizar/{{ demanda.id }}" method="POST">
                             <div class="row mb-3">
                                 <div class="col-md-4 border-end mb-3 mb-md-0">
-                                    <label class="form-label fw-bold text-secondary">Status Atual</label>
-                                    <select name="status" class="form-select form-select-sm mb-3">
-                                        <option value="A Fazer" {{% if demanda.status == 'A Fazer' %}}selected{{% endif %}}>A Fazer</option>
-                                        <option value="Em Andamento" {{% if demanda.status == 'Em Andamento' %}}selected{{% endif %}}>Em Andamento</option>
-                                        <option value="Concluído" {{% if demanda.status == 'Concluído' %}}selected{{% endif %}}>Concluído</option>
+                                    <label class="form-label fw-bold text-secondary">Editar Status</label>
+                                    <select name="status" class="form-select form-select-sm mb-3 border-primary">
+                                        <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>Pendente</option>
+                                        <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>Iniciado</option>
+                                        <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>Finalizado</option>
                                     </select>
-                                    <p class="mb-1 small"><strong>Solicitado:</strong> {{{{ demanda.data_solicitacao.strftime('%d/%m/%Y') }}}}</p>
-                                    <p class="mb-1 small"><strong>Início:</strong> {{{{ demanda.data_inicio.strftime('%d/%m/%Y') if demanda.data_inicio else '-' }}}}</p>
+                                    <p class="mb-1 small"><strong>Solicitado:</strong> {{ demanda.data_solicitacao.strftime('%d/%m/%Y') }}</p>
                                 </div>
                                 <div class="col-md-8">
                                     <label class="form-label fw-bold text-secondary">Descrição Detalhada</label>
-                                    <p class="bg-light p-2 rounded small text-dark" style="white-space: pre-wrap;">{{{{ demanda.descricao }}}}</p>
+                                    <p class="bg-light p-2 rounded small text-dark" style="white-space: pre-wrap;">{{ demanda.descricao }}</p>
                                 </div>
                             </div>
                             
-                            <h6 class="fw-bold text-secondary mb-2">Checklist de Tarefas</h6>
-                            <div class="mb-3 bg-light p-3 rounded">
-                                {{% for chk in demanda.checklists %}}
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" name="checklist_passos[]" value="{{{{ chk.id }}}}" id="chk{{{{ chk.id }}}}" {{% if chk.concluido %}}checked{{% endif %}}>
-                                    <label class="form-check-label {{% if chk.concluido %}}text-decoration-line-through text-muted{{% endif %}}" for="chk{{{{ chk.id }}}}">{{{{ chk.passo }}}}</label>
+                            <h6 class="fw-bold text-secondary mb-1">Checklist de Tarefas</h6>
+                            
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="progress flex-grow-1 me-2" style="height: 12px;">
+                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-info{% endif %}" role="progressbar" style="width: {{ percentual }}%;" aria-valuenow="{{ percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
-                                {{% else %}}
+                                <small class="fw-bold text-muted">{{ percentual }}%</small>
+                            </div>
+
+                            <div class="mb-3 bg-light p-3 rounded">
+                                {% for chk in demanda.checklists %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input border-secondary" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %}>
+                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
+                                </div>
+                                {% else %}
                                 <p class="text-muted small mb-0">Nenhum passo cadastrado.</p>
-                                {{% endfor %}}
+                                {% endfor %}
                             </div>
                             <div class="d-flex justify-content-end">
-                                <button type="submit" class="btn btn-sm btn-success fw-bold px-4">Salvar Alterações</button>
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">💾 Salvar Alterações</button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
-            {{% else %}}
+            {% else %}
             <div class="text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Sem demandas ativas! 🚀</p></div>
-            {{% endfor %}}
+            {% endfor %}
         </div>
     </div>
 </body>
 </html>
 """
 
-TELA_ATAS = f"""
+TELA_ATAS = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -168,7 +186,7 @@ TELA_ATAS = f"""
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {MENU_TOPO}
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
             <h3 class="mb-2 mb-md-0 text-secondary">📁 Atas de Reunião</h3>
@@ -177,39 +195,39 @@ TELA_ATAS = f"""
 
         <form method="GET" action="/atas" class="mb-4">
             <div class="input-group shadow-sm">
-                <input type="text" name="busca" class="form-control" placeholder="Pesquisar atas..." value="{{{{ busca }}}}">
+                <input type="text" name="busca" class="form-control" placeholder="Pesquisar atas..." value="{{ busca }}">
                 <button class="btn btn-dark" type="submit">🔍 Buscar</button>
             </div>
         </form>
 
         <div class="row">
-            {{% for ata in atas %}}
+            {% for ata in atas %}
             <div class="col-md-6 mb-3">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-body d-flex flex-column justify-content-between">
                         <div>
                             <div class="d-flex justify-content-between align-items-start">
-                                <h5 class="card-title text-dark fw-bold text-truncate" style="max-width: 75%;">{{{{ ata.assunto }}}}</h5>
-                                <small class="text-muted">{{{{ ata.data_criacao.strftime('%d/%m/%Y') }}}}</small>
+                                <h5 class="card-title text-dark fw-bold text-truncate" style="max-width: 75%;">{{ ata.assunto }}</h5>
+                                <small class="text-muted">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</small>
                             </div>
                             <p class="card-text text-muted small mt-2" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                                {{{{ ata.topicos }}}}
+                                {{ ata.topicos }}
                             </p>
                         </div>
-                        <a href="/gerar_pdf_ata/{{{{ ata.id }}}}" class="btn btn-sm btn-outline-danger fw-bold mt-3 align-self-start">📄 Baixar PDF</a>
+                        <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-sm btn-outline-danger fw-bold mt-3 align-self-start">📄 Baixar PDF</a>
                     </div>
                 </div>
             </div>
-            {{% else %}}
+            {% else %}
             <div class="col-12 text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Nenhuma ata encontrada.</p></div>
-            {{% endfor %}}
+            {% endfor %}
         </div>
     </div>
 </body>
 </html>
 """
 
-TELA_NOVA_ATA = f"""
+TELA_NOVA_ATA = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -219,7 +237,7 @@ TELA_NOVA_ATA = f"""
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {MENU_TOPO}
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 800px;">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-info text-white p-3">
@@ -247,7 +265,7 @@ TELA_NOVA_ATA = f"""
 </html>
 """
 
-TELA_NOVA_DEMANDA = f"""
+TELA_NOVA_DEMANDA = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -257,7 +275,7 @@ TELA_NOVA_DEMANDA = f"""
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    {MENU_TOPO}
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 800px;">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
@@ -330,13 +348,15 @@ TELA_NOVA_DEMANDA = f"""
 # ==========================================
 @app.route('/')
 def index():
-    demandas_ativas = Demanda.query.filter(Demanda.status != 'Concluído').all()
+    # Só não mostra as que estão como 'Finalizado'
+    demandas_ativas = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_ativas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
     texto_whats = "🚀 *RESUMO DIÁRIO - DEMANDAS*\n\n"
     texto_whats += f"Temos *{len(demandas_ativas)} demandas* em aberto:\n\n"
     icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
+    
     for d in demandas_ativas:
         ico = icones.get(d.prioridade, '🔹')
         texto_whats += f"{ico} *[{d.prioridade.upper()}]* {d.descricao[:50]}...\n"
@@ -344,16 +364,24 @@ def index():
         
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/?text={texto_codificado}"
+    
     return render_template_string(TELA_PRINCIPAL, demandas=demandas_ativas, link_whatsapp=link_whatsapp)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
     if request.method == 'POST':
-        nova_dem = Demanda(area=request.form['area'], descricao=request.form['descricao'], prioridade=request.form['prioridade'], data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form['data_inicio'] else None, data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date())
+        nova_dem = Demanda(
+            area=request.form['area'], 
+            descricao=request.form['descricao'], 
+            prioridade=request.form['prioridade'], 
+            data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form['data_inicio'] else None, 
+            data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
+        )
         db.session.add(nova_dem)
         db.session.flush() 
         for passo in request.form.getlist('passo_checklist[]'):
-            if passo.strip(): db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
+            if passo.strip(): 
+                db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
         return redirect(url_for('index'))
     return render_template_string(TELA_NOVA_DEMANDA)
@@ -361,12 +389,20 @@ def nova_demanda():
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
-    demanda.status = request.form['status']
-    demanda.data_conclusao = datetime.utcnow().date() if demanda.status == 'Concluído' else None
+    demanda.status = request.form.get('status')
     
-    ids_marcados = [int(i) for i in request.form.getlist('checklist_passos[]')]
+    if demanda.status == 'Finalizado':
+        demanda.data_conclusao = datetime.utcnow().date()
+    else:
+        demanda.data_conclusao = None
+    
+    # Atualiza Checklists
+    passos_marcados = request.form.getlist('checklist_passos[]')
+    ids_marcados = [int(i) for i in passos_marcados]
+    
     for chk in demanda.checklists:
         chk.concluido = chk.id in ids_marcados
+        
     db.session.commit()
     return redirect(url_for('index'))
 
