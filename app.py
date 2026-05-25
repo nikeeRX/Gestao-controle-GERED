@@ -28,7 +28,7 @@ class Demanda(db.Model):
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='Pendente') # Pendente, Iniciado, Finalizado
+    status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
@@ -50,23 +50,26 @@ class AtaReuniao(db.Model):
     topicos = db.Column(db.Text, nullable=False)
 
 # ==========================================
-# 3. CRIAÇÃO E MIGRAÇÃO AUTOMÁTICA DO BANCO
+# 3. CRIAÇÃO DO BANCO (LIMPO)
 # ==========================================
 with app.app_context():
-    # Cria tabelas novas se não existirem (como a de atas)
     db.create_all()
-    
-    # Executa a alteração da tabela antiga automaticamente caso falte a coluna status
-    try:
-        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'Pendente';"))
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        print(f"Aviso de sincronizacao de banco: {e}")
 
 # ==========================================
-# 4. TELAS VISUAIS EM TEXTO PURO (SEM ERROS)
+# 4. TELAS DO SISTEMA
 # ==========================================
+MENU_TOPO = """
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+    <div class="container" style="max-width: 1000px;">
+        <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
+        <div class="d-flex">
+            <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
+            <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
+        </div>
+    </div>
+</nav>
+"""
+
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -78,16 +81,7 @@ TELA_PRINCIPAL = """
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container" style="max-width: 1000px;">
-            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-            <div class="d-flex">
-                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-            </div>
-        </div>
-    </nav>
-
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
             <h3 class="mb-2 mb-md-0 text-secondary">Acompanhamento de Demandas</h3>
@@ -202,16 +196,7 @@ TELA_NOVA_DEMANDA = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container" style="max-width: 1000px;">
-            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-            <div class="d-flex">
-                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-            </div>
-        </div>
-    </nav>
-
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 800px;">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
@@ -289,16 +274,7 @@ TELA_ATAS = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container" style="max-width: 1000px;">
-            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-            <div class="d-flex">
-                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-            </div>
-        </div>
-    </nav>
-
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
             <h3 class="mb-2 mb-md-0 text-secondary">📁 Atas de Reunião</h3>
@@ -349,16 +325,7 @@ TELA_NOVA_ATA = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container" style="max-width: 1000px;">
-            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-            <div class="d-flex">
-                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-            </div>
-        </div>
-    </nav>
-
+    """ + MENU_TOPO + """
     <div class="container" style="max-width: 800px;">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-info text-white p-3">
