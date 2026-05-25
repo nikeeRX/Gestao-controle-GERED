@@ -26,10 +26,11 @@ db = SQLAlchemy(app)
 class Demanda(db.Model):
     __tablename__ = 'demandas'
     id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título') # NOVO CAMPO: TÍTULO
     area = db.Column(db.String(50), nullable=False)
-    descricao = db.Column(db.Text, nullable=False)
+    descricao = db.Column(db.Text, nullable=False) # AGORA FUNCIONA COMO OBSERVAÇÃO
     prioridade = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='Pendente') # Pendente, Iniciado, Finalizado
+    status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
@@ -50,8 +51,14 @@ class AtaReuniao(db.Model):
     data_criacao = db.Column(db.Date, default=datetime.utcnow().date)
     topicos = db.Column(db.Text, nullable=False)
 
+# Auto-atualização do banco para não precisar apagar o Postgres de novo
 with app.app_context():
     db.create_all()
+    try:
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS titulo VARCHAR(150) DEFAULT 'Demanda Antiga';"))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
 
 # ==========================================
 # 3. CSS GLOBAL E DESIGN MOBILE (APP STYLE)
@@ -62,28 +69,16 @@ ESTILO_APP = """
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 <style>
     body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-top: 65px; padding-bottom: 85px; }
-    
-    /* Header Fixo superior */
     .app-header { position: fixed; top: 0; left: 0; right: 0; background: #ffffff; height: 60px; display: flex; align-items: center; justify-content: center; z-index: 1030; box-shadow: 0 1px 3px rgba(0,0,0,0.05); font-weight: 700; font-size: 1.15rem; color: #1d1d1f; }
-    
-    /* Menu Fixo Inferior */
     .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; height: 65px; display: flex; justify-content: space-around; align-items: center; z-index: 1030; box-shadow: 0 -2px 10px rgba(0,0,0,0.04); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid #f1f1f1; }
     .nav-item { text-decoration: none; color: #8e8e93; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; flex: 1; font-weight: 500; }
     .nav-item.active { color: #007aff; }
     .nav-icon { font-size: 1.35rem; margin-bottom: 2px; }
-    
-    /* Container Limitador */
     .container-app { max-width: 600px; margin: auto; padding: 0 15px; }
-    
-    /* Cards Arredondados Mobile */
     .card-app { background: #fff; border-radius: 16px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 14px; overflow: hidden; }
     .card-app-header { padding: 15px; border-bottom: 1px solid #f8f9fa; cursor: pointer; }
-    
-    /* Botão Flutuante Direito (FAB) */
     .fab { position: fixed; bottom: 85px; right: 20px; background: #007aff; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 12px rgba(0,122,255,0.35); text-decoration: none; z-index: 1020; }
     .fab:active { transform: scale(0.95); color: white; }
-    
-    /* Form Customizations */
     .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; font-size: 0.95rem; }
     .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.25rem rgba(0,122,255,0.1); }
     .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; font-size: 0.95rem; }
@@ -105,7 +100,7 @@ MENU_INFERIOR = """
 """
 
 # ==========================================
-# 4. TEMPLATES HTML COMPATÍVEIS
+# 4. TEMPLATES HTML
 # ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
@@ -119,9 +114,17 @@ TELA_PRINCIPAL = """
     <div class="app-header">🚀 JPMS System</div>
     
     <div class="container-app mt-3">
-        <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-4 shadow-sm">
+        <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-3 shadow-sm">
             <i class="bi bi-whatsapp"></i> Enviar Resumo no WhatsApp
         </a>
+        
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group w-100 shadow-sm" style="border-radius: 12px; overflow: hidden; border: 1px solid #e5e5ea;">
+                <a href="/?status=Pendente" class="btn btn-sm {% if filtro == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">⏳ Pendentes</a>
+                <a href="/?status=Iniciado" class="btn btn-sm {% if filtro == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">🚀 Iniciados</a>
+                <a href="/?status=Finalizado" class="btn btn-sm {% if filtro == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">✅ Finalizados</a>
+            </div>
+        </div>
         
         <div class="accordion" id="accordionDemandas">
             {% for demanda in demandas %}
@@ -136,18 +139,23 @@ TELA_PRINCIPAL = """
             <div class="card-app">
                 <div class="card-app-header" data-bs-toggle="collapse" data-bs-target="#collapse{{ demanda.id }}">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="me-2">
+                        <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
                             {% if demanda.prioridade == 'Extremo' %}<span class="badge bg-danger">🔴 Extremo</span>
                             {% elif demanda.prioridade == 'Alto' %}<span class="badge bg-warning text-dark">🟡 Alto</span>
                             {% elif demanda.prioridade == 'Médio' %}<span class="badge bg-info text-dark">🔵 Médio</span>
                             {% else %}<span class="badge bg-secondary">🟢 Mínimo</span>{% endif %}
-                            <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.descricao[:55] }}...</h6>
+                            
+                            <h6 class="mt-2 mb-1 fw-bold text-dark" style="line-height: 1.3;">{{ demanda.titulo }}</h6>
                         </div>
-                        <div class="text-end" style="min-width: 95px;">
-                            {% if demanda.status == 'Finalizado' %}<span class="badge bg-success d-block mb-1">Finalizado</span>
-                            {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary d-block mb-1">Iniciado</span>
-                            {% else %}<span class="badge bg-secondary d-block mb-1">Pendente</span>{% endif %}
+                        
+                        <div class="text-end" style="min-width: 110px;">
+                            <div class="d-flex justify-content-end align-items-center mb-1">
+                                <span class="badge bg-light text-dark border me-1">{{ percentual }}%</span>
+                                {% if demanda.status == 'Finalizado' %}<span class="badge bg-success">Finalizado</span>
+                                {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary">Iniciado</span>
+                                {% else %}<span class="badge bg-secondary">Pendente</span>{% endif %}
+                            </div>
                             <small class="text-danger fw-bold d-block" style="font-size: 0.7rem;">📅 {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
                         </div>
                     </div>
@@ -155,7 +163,7 @@ TELA_PRINCIPAL = """
                 
                 <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
                     <div class="card-body p-3 border-top">
-                        <form action="/atualizar/{{ demanda.id }}" method="POST">
+                        <form action="/atualizar/{{ demanda.id }}?origem={{ filtro }}" method="POST">
                             <label class="form-label fw-bold text-secondary small">Status da Demanda</label>
                             <select name="status" class="form-select form-select-sm mb-3 border-primary shadow-sm">
                                 <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
@@ -163,8 +171,9 @@ TELA_PRINCIPAL = """
                                 <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
                             </select>
                             
-                            <div class="bg-light p-3 rounded mb-3">
-                                <small class="text-dark d-block"><strong>Descrição Completa:</strong> {{ demanda.descricao }}</small>
+                            <div class="bg-light p-3 rounded mb-3 border">
+                                <span class="badge bg-secondary mb-2">Observações / Detalhes</span>
+                                <small class="text-dark d-block" style="white-space: pre-wrap;">{{ demanda.descricao }}</small>
                             </div>
                             
                             <h6 class="fw-bold text-secondary mb-2 small">Progresso do Checklist</h6>
@@ -193,7 +202,7 @@ TELA_PRINCIPAL = """
             {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-inbox fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma demanda pendente por aqui! 🚀</p>
+                <p class="text-muted mt-2">Nenhuma demanda nesta categoria! 🎉</p>
             </div>
             {% endfor %}
         </div>
@@ -222,29 +231,35 @@ TELA_NOVA_DEMANDA = """
     <div class="container-app mt-3">
         <form method="POST">
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Área Responsável</label>
-                <select name="area" class="form-select" required>
-                    <option value="CODER">CODER</option>
-                    <option value="COCAP">COCAP</option>
-                    <option value="CONEC">CONEC</option>
-                    <option value="GERED">GERED</option>
-                    <option value="EXTERNO">EXTERNO</option>
-                </select>
+                <label class="form-label fw-bold text-secondary small">Título da Demanda</label>
+                <input type="text" name="titulo" class="form-control" placeholder="Ex: Criação de Dashboard ANS..." required>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-6">
+                    <label class="form-label fw-bold text-secondary small">Área Responsável</label>
+                    <select name="area" class="form-select" required>
+                        <option value="CODER">CODER</option>
+                        <option value="COCAP">COCAP</option>
+                        <option value="CONEC">CONEC</option>
+                        <option value="GERED">GERED</option>
+                        <option value="EXTERNO">EXTERNO</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold text-secondary small">Prioridade</label>
+                    <select name="prioridade" class="form-select" required>
+                        <option value="Mínimo">🟢 Mínimo</option>
+                        <option value="Médio" selected>🔵 Médio</option>
+                        <option value="Alto">🟡 Alto</option>
+                        <option value="Extremo">🔴 Extremo</option>
+                    </select>
+                </div>
             </div>
             
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Prioridade</label>
-                <select name="prioridade" class="form-select" required>
-                    <option value="Mínimo">🟢 Mínimo</option>
-                    <option value="Médio" selected>🔵 Médio</option>
-                    <option value="Alto">🟡 Alto</option>
-                    <option value="Extremo">🔴 Extremo</option>
-                </select>
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Descrição do Trabalho</label>
-                <textarea name="descricao" class="form-control" rows="3" placeholder="Insira o escopo ou resumo..." required></textarea>
+                <label class="form-label fw-bold text-secondary small">Observações / Escopo Detalhado</label>
+                <textarea name="descricao" class="form-control" rows="3" placeholder="Insira os detalhes técnicos, links ou resumos..." required></textarea>
             </div>
             
             <div class="row mb-4">
@@ -254,7 +269,7 @@ TELA_NOVA_DEMANDA = """
                 </div>
                 <div class="col-6">
                     <label class="form-label fw-bold text-danger small">Previsão Fim</label>
-                    <input type="date" name="data_prevista" class="form-control border-danger" required>
+                    <input type="date" name="data_prevista" class="form-control" required>
                 </div>
             </div>
             
@@ -268,7 +283,7 @@ TELA_NOVA_DEMANDA = """
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-app w-100 mb-4">Salvar Registro</button>
+            <button type="submit" class="btn btn-primary btn-app w-100 mb-4 shadow-sm">Salvar Registro</button>
         </form>
     </div>
     <script>
@@ -317,7 +332,6 @@ TELA_ATAS = """
                     <p class="text-muted small mb-3" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap;">
                         {{ ata.topicos }}
                     </p>
-                    
                     <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold">
                         <i class="bi bi-file-earmark-pdf-fill"></i> Baixar Arquivo PDF
                     </a>
@@ -375,28 +389,35 @@ TELA_NOVA_ATA = """
 # ==========================================
 @app.route('/')
 def index():
-    demandas_ativas = Demanda.query.filter(Demanda.status != 'Finalizado').all()
-    peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
-    demandas_ativas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
+    filtro = request.args.get('status', 'Pendente')
     
-    texto_whats = "🚀 *RESUMO DIÁRIO - DEMANDAS*\n\n"
-    texto_whats += f"Temos *{len(demandas_ativas)} demandas* em aberto:\n\n"
+    demandas_filtradas = Demanda.query.filter(Demanda.status == filtro).all()
+    peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
+    demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
+    
+    demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
+    demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
+    
+    texto_whats = "🚀 *RESUMO DIÁRIO - DEMANDAS EM ABERTO*\n\n"
+    texto_whats += f"Temos *{len(demandas_em_aberto)} demandas* pendentes:\n\n"
     icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
     
-    for d in demandas_ativas:
+    for d in demandas_em_aberto:
         ico = icones.get(d.prioridade, '🔹')
-        texto_whats += f"{ico} *[{d.prioridade.upper()}]* {d.descricao[:50]}...\n"
+        # WHATSAPP AGORA MOSTRA O TÍTULO!
+        texto_whats += f"{ico} *[{d.prioridade.upper()}]* {d.titulo}\n"
         texto_whats += f"└ *Setor:* {d.area} | *Prev:* {d.data_prevista.strftime('%d/%m/%Y')} | *Status:* {d.status}\n\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/?text={texto_codificado}"
     
-    return render_template_string(TELA_PRINCIPAL, demandas=demandas_ativas, link_whatsapp=link_whatsapp, page='demandas')
+    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro=filtro)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
     if request.method == 'POST':
         nova_dem = Demanda(
+            titulo=request.form.get('titulo', 'Sem título'), # NOVO CAMPO SALVANDO
             area=request.form['area'], 
             descricao=request.form['descricao'], 
             prioridade=request.form['prioridade'], 
@@ -409,13 +430,14 @@ def nova_demanda():
             if passo.strip(): 
                 db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('index', status='Pendente'))
     return render_template_string(TELA_NOVA_DEMANDA)
 
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
     demanda.status = request.form.get('status')
+    origem = request.args.get('origem', 'Pendente')
     
     if demanda.status == 'Finalizado':
         demanda.data_conclusao = datetime.utcnow().date()
@@ -429,7 +451,7 @@ def atualizar(id):
         chk.concluido = chk.id in ids_marcados
         
     db.session.commit()
-    return redirect(url_for('index'))
+    return redirect(url_for('index', status=origem))
 
 @app.route('/atas')
 def lista_atas():
@@ -456,13 +478,11 @@ def gerar_pdf_ata(id):
         pdf = FPDF()
         pdf.add_page()
         
-        # Filtro de codificação robusto contra quebras de caracteres especiais/emojis
         def limpa_texto(texto):
             return str(texto).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.set_font("helvetica", style="B", size=16)
         
-        # CORREÇÃO CRUCIAL AQUI: Título agora passa pelo textwrap.wrap
         titulo_completo = limpa_texto(f"Ata de Reunião: {ata.assunto}")
         linhas_titulo = textwrap.wrap(titulo_completo, width=45, break_long_words=True)
         for linha_t in linhas_titulo:
@@ -483,7 +503,6 @@ def gerar_pdf_ata(id):
             linha_limpa = linha.strip()
             if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
-                # textwrap cortando qualquer palavra gigante ou link na marra em blocos seguros
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
                 for pedaco in linhas_quebradas:
                     pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
