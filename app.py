@@ -18,14 +18,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # ==========================================
-# MODELOS DE BANCO DE DADOS
+# 1. MODELOS DE BANCO DE DADOS
 # ==========================================
 class Demanda(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='A Fazer') # Campo de Status ativo
+    status = db.Column(db.String(20), default='A Fazer') 
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
@@ -48,7 +48,7 @@ with app.app_context():
     db.create_all()
 
 # ==========================================
-# COMPONENTES VISUAIS (HTML COM VIEWPORT MOBILE)
+# 2. TELAS DO SISTEMA (VISUAL + MOBILE)
 # ==========================================
 MENU_TOPO = """
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
@@ -76,9 +76,7 @@ TELA_PRINCIPAL = """
     """ + MENU_TOPO + """
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h3 class="mb-0 text-secondary">Acompanhamento de Demandas</h3>
-            </div>
+            <h3 class="mb-0 text-secondary">Acompanhamento de Demandas</h3>
             <div>
                 <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success fw-bold btn-sm me-1">📱 Resumo Zap</a>
                 <a href="/nova_demanda" class="btn btn-primary fw-bold btn-sm">+ Nova Demanda</a>
@@ -154,6 +152,84 @@ TELA_PRINCIPAL = """
             {% endfor %}
         </div>
     </div>
+</body>
+</html>
+"""
+
+TELA_NOVA_DEMANDA = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Demanda | Sistema-JPMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    """ + MENU_TOPO + """
+    <div class="container" style="max-width: 800px;">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <label class="form-label fw-bold">Área Responsável</label>
+                            <select name="area" class="form-select" required>
+                                <option value="CODER">CODER</option>
+                                <option value="COCAP">COCAP</option>
+                                <option value="CONEC">CONEC</option>
+                                <option value="GERED">GERED</option>
+                                <option value="EXTERNO">EXTERNO</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Prioridade</label>
+                            <select name="prioridade" class="form-select" required>
+                                <option value="Mínimo">Mínimo</option>
+                                <option value="Médio" selected>Médio</option>
+                                <option value="Alto">Alto</option>
+                                <option value="Extremo">Extremo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Descrição da Demanda</label>
+                        <textarea name="descricao" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <label class="form-label fw-bold">Data de Início</label>
+                            <input type="date" name="data_inicio" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-danger">Data Prevista para Conclusão</label>
+                            <input type="date" name="data_prevista" class="form-control border-danger" required>
+                        </div>
+                    </div>
+                    <div class="bg-light p-3 rounded border">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Checklist</h5>
+                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="adicionarPasso()">+ Passo</button>
+                        </div>
+                        <div id="checklist-container"><input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Etapa 1..."></div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="/" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success px-5 fw-bold">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        function adicionarPasso() {
+            const c = document.getElementById('checklist-container');
+            const i = document.createElement('input');
+            i.type='text'; i.name='passo_checklist[]'; i.className='form-control mb-2'; i.placeholder='Próxima etapa...';
+            c.appendChild(i);
+        }
+    </script>
 </body>
 </html>
 """
@@ -247,86 +323,8 @@ TELA_NOVA_ATA = """
 </html>
 """
 
-TELA_NOVA_DEMANDA = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Demanda</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 800px;">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="row mb-3">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <label class="form-label fw-bold">Área Responsável</label>
-                            <select name="area" class="form-select" required>
-                                <option value="CODER">CODER</option>
-                                <option value="COCAP">COCAP</option>
-                                <option value="CONEC">CONEC</option>
-                                <option value="GERED">GERED</option>
-                                <option value="EXTERNO">EXTERNO</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">Prioridade</label>
-                            <select name="prioridade" class="form-select" required>
-                                <option value="Mínimo">Mínimo</option>
-                                <option value="Médio" selected>Médio</option>
-                                <option value="Alto">Alto</option>
-                                <option value="Extremo">Extremo</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Descrição da Demanda</label>
-                        <textarea name="descricao" class="form-control" rows="3" required></textarea>
-                    </div>
-                    <div class="row mb-4">
-                        <div class="col-md-6 mb-3 mb-md-0">
-                            <label class="form-label fw-bold">Data de Início</label>
-                            <input type="date" name="data_inicio" class="form-control">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-danger">Data Prevista para Conclusão</label>
-                            <input type="date" name="data_prevista" class="form-control border-danger" required>
-                        </div>
-                    </div>
-                    <div class="bg-light p-3 rounded border">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Checklist</h5>
-                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="adicionarPasso()">+ Passo</button>
-                        </div>
-                        <div id="checklist-container"><input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Etapa 1..."></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="/" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-success px-5 fw-bold">Salvar Demanda</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <script>
-        function adicionarPasso() {
-            const c = document.getElementById('checklist-container');
-            const i = document.createElement('input');
-            i.type='text'; i.name='passo_checklist[]'; i.className='form-control mb-2'; i.placeholder='Próxima etapa...';
-            c.appendChild(i);
-        }
-    </script>
-</body>
-</html>
-"""
-
 # ==========================================
-# ROTAS E LÓGICA DO SISTEMA
+# 3. ROTAS E LÓGICA DO SISTEMA
 # ==========================================
 @app.route('/')
 def index():
@@ -362,7 +360,10 @@ def nova_demanda():
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
     demanda.status = request.form['status']
-    demanda.data_conclusao = datetime.utcnow().date() if Scientific == 'Concluído' else None
+    
+    # Bug consertado aqui:
+    demanda.data_conclusao = datetime.utcnow().date() if demanda.status == 'Concluído' else None
+    
     ids_marcados = [int(i) for i in request.form.getlist('checklist_passos[]')]
     for chk in demanda.checklists:
         chk.concluido = chk.id in ids_marcados
