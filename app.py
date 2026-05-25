@@ -29,7 +29,7 @@ class Demanda(db.Model):
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), default='Pendente')
+    status = db.Column(db.String(20), default='Pendente') # Pendente, Iniciado, Finalizado
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
@@ -461,8 +461,12 @@ def gerar_pdf_ata(id):
             return str(texto).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.set_font("helvetica", style="B", size=16)
-        # multi_cell no título para garantir que caiba na folha
-        pdf.multi_cell(0, 10, limpa_texto(f"Ata de Reunião: {ata.assunto}"), align="C")
+        
+        # CORREÇÃO CRUCIAL AQUI: Título agora passa pelo textwrap.wrap
+        titulo_completo = limpa_texto(f"Ata de Reunião: {ata.assunto}")
+        linhas_titulo = textwrap.wrap(titulo_completo, width=45, break_long_words=True)
+        for linha_t in linhas_titulo:
+            pdf.multi_cell(0, 10, linha_t, align="C", new_x="LMARGIN", new_y="NEXT")
         
         pdf.set_font("helvetica", style="I", size=10)
         pdf.cell(0, 10, limpa_texto(f"Data: {ata.data_criacao.strftime('%d/%m/%Y')}"), new_x="LMARGIN", new_y="NEXT", align="C")
@@ -479,10 +483,10 @@ def gerar_pdf_ata(id):
             linha_limpa = linha.strip()
             if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
-                # O CÓDIGO SALVA-VIDAS: textwrap cortando qualquer palavra gigante na marra
-                linhas_quebradas = textwrap.wrap(texto_final, width=90, break_long_words=True)
+                # textwrap cortando qualquer palavra gigante ou link na marra em blocos seguros
+                linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
                 for pedaco in linhas_quebradas:
-                    pdf.multi_cell(0, 8, pedaco)
+                    pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
                 contador += 1
                 
         pdf_bytes = bytes(pdf.output())
