@@ -23,6 +23,7 @@ db = SQLAlchemy(app)
 # 2. MODELOS DE BANCO DE DADOS
 # ==========================================
 class Demanda(db.Model):
+    __tablename__ = 'demandas'
     id = db.Column(db.Integer, primary_key=True)
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
@@ -35,35 +36,37 @@ class Demanda(db.Model):
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
 class Checklist(db.Model):
+    __tablename__ = 'checklists'
     id = db.Column(db.Integer, primary_key=True)
-    demanda_id = db.Column(db.Integer, db.ForeignKey('demanda.id'), nullable=False)
+    demanda_id = db.Column(db.Integer, db.ForeignKey('demandas.id'), nullable=False)
     passo = db.Column(db.String(200), nullable=False)
     concluido = db.Column(db.Boolean, default=False)
 
 class AtaReuniao(db.Model):
+    __tablename__ = 'atas_reuniao'
     id = db.Column(db.Integer, primary_key=True)
     assunto = db.Column(db.String(200), nullable=False)
     data_criacao = db.Column(db.Date, default=datetime.utcnow().date)
     topicos = db.Column(db.Text, nullable=False)
 
+# ==========================================
+# 3. CRIAÇÃO E MIGRAÇÃO AUTOMÁTICA DO BANCO
+# ==========================================
 with app.app_context():
+    # Cria tabelas novas se não existirem (como a de atas)
     db.create_all()
+    
+    # Executa a alteração da tabela antiga automaticamente caso falte a coluna status
+    try:
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'Pendente';"))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Aviso de sincronizacao de banco: {e}")
 
 # ==========================================
-# 3. TELAS (HTML + BOOTSTRAP)
+# 4. TELAS VISUAIS EM TEXTO PURO (SEM ERROS)
 # ==========================================
-MENU_TOPO = """
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-    <div class="container" style="max-width: 1000px;">
-        <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
-        <div class="d-flex">
-            <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
-            <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
-        </div>
-    </div>
-</nav>
-"""
-
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -75,7 +78,16 @@ TELA_PRINCIPAL = """
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body class="bg-light">
-    """ + MENU_TOPO + """
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container" style="max-width: 1000px;">
+            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
+            <div class="d-flex">
+                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
+                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container" style="max-width: 1000px;">
         <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
             <h3 class="mb-2 mb-md-0 text-secondary">Acompanhamento de Demandas</h3>
@@ -89,8 +101,13 @@ TELA_PRINCIPAL = """
             {% for demanda in demandas %}
             
             {% set total_chk = demanda.checklists|length %}
-            {% set concluidos = demanda.checklists|selectattr("concluido", "equalto", True)|list|length %}
-            {% set percentual = (concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
+            {% set ns = namespace(concluidos=0) %}
+            {% for chk in demanda.checklists %}
+                {% if chk.concluido %}
+                    {% set ns.concluidos = ns.concluidos + 1 %}
+                {% endif %}
+            {% endfor %}
+            {% set percentual = (ns.concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
 
             <div class="accordion-item mb-3 border-0 shadow-sm rounded">
                 <h2 class="accordion-header" id="heading{{ demanda.id }}">
@@ -109,7 +126,7 @@ TELA_PRINCIPAL = """
                                 {% endif %}
                                 <div class="mt-1 text-dark fw-semibold" style="font-size: 0.95rem;">{{ demanda.descricao[:70] }}...</div>
                             </div>
-                            <div class="text-end mt-2 mt-sm-0" style="min-width: 120px;">
+                            <div class="text-end mt-2 mt-sm-0" style="min-width: 125px;">
                                 {% if demanda.status == 'Finalizado' %}
                                     <span class="badge bg-success d-block mb-1">Finalizado</span>
                                 {% elif demanda.status == 'Iniciado' %}
@@ -142,10 +159,9 @@ TELA_PRINCIPAL = """
                             </div>
                             
                             <h6 class="fw-bold text-secondary mb-1">Checklist de Tarefas</h6>
-                            
                             <div class="d-flex align-items-center mb-3">
                                 <div class="progress flex-grow-1 me-2" style="height: 12px;">
-                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-info{% endif %}" role="progressbar" style="width: {{ percentual }}%;" aria-valuenow="{{ percentual }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-info{% endif %}" role="progressbar" style="width: {{ percentual }}%;"></div>
                                 </div>
                                 <small class="fw-bold text-muted">{{ percentual }}%</small>
                             </div>
@@ -176,95 +192,6 @@ TELA_PRINCIPAL = """
 </html>
 """
 
-TELA_ATAS = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atas | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 1000px;">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
-            <h3 class="mb-2 mb-md-0 text-secondary">📁 Atas de Reunião</h3>
-            <a href="/nova_ata" class="btn btn-info text-white fw-bold btn-sm">+ Criar Ata</a>
-        </div>
-
-        <form method="GET" action="/atas" class="mb-4">
-            <div class="input-group shadow-sm">
-                <input type="text" name="busca" class="form-control" placeholder="Pesquisar atas..." value="{{ busca }}">
-                <button class="btn btn-dark" type="submit">🔍 Buscar</button>
-            </div>
-        </form>
-
-        <div class="row">
-            {% for ata in atas %}
-            <div class="col-md-6 mb-3">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-body d-flex flex-column justify-content-between">
-                        <div>
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h5 class="card-title text-dark fw-bold text-truncate" style="max-width: 75%;">{{ ata.assunto }}</h5>
-                                <small class="text-muted">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</small>
-                            </div>
-                            <p class="card-text text-muted small mt-2" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                                {{ ata.topicos }}
-                            </p>
-                        </div>
-                        <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-sm btn-outline-danger fw-bold mt-3 align-self-start">📄 Baixar PDF</a>
-                    </div>
-                </div>
-            </div>
-            {% else %}
-            <div class="col-12 text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Nenhuma ata encontrada.</p></div>
-            {% endfor %}
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-TELA_NOVA_ATA = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Ata | Sistema-JPMS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    """ + MENU_TOPO + """
-    <div class="container" style="max-width: 800px;">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-info text-white p-3">
-                <h4 class="mb-0">Cadastrar Ata de Reunião</h4>
-            </div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Assunto / Título da Reunião</label>
-                        <input type="text" name="assunto" class="form-control" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Tópicos Discutidos (Um por linha)</label>
-                        <textarea name="topicos" class="form-control" rows="8" placeholder="Pressione Enter para cada novo tópico..." required></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between">
-                        <a href="/atas" class="btn btn-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-info text-white fw-bold px-5">Salvar e Gerar PDF</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
 TELA_NOVA_DEMANDA = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -275,7 +202,16 @@ TELA_NOVA_DEMANDA = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-    """ + MENU_TOPO + """
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container" style="max-width: 1000px;">
+            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
+            <div class="d-flex">
+                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
+                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container" style="max-width: 800px;">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-dark text-white p-3"><h4 class="mb-0">Cadastrar Nova Demanda</h4></div>
@@ -343,12 +279,118 @@ TELA_NOVA_DEMANDA = """
 </html>
 """
 
+TELA_ATAS = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atas | Sistema-JPMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container" style="max-width: 1000px;">
+            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
+            <div class="d-flex">
+                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
+                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 1000px;">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+            <h3 class="mb-2 mb-md-0 text-secondary">📁 Atas de Reunião</h3>
+            <a href="/nova_ata" class="btn btn-info text-white fw-bold btn-sm">+ Criar Ata</a>
+        </div>
+
+        <form method="GET" action="/atas" class="mb-4">
+            <div class="input-group shadow-sm">
+                <input type="text" name="busca" class="form-control" placeholder="Pesquisar atas..." value="{{ busca }}">
+                <button class="btn btn-dark" type="submit">🔍 Buscar</button>
+            </div>
+        </form>
+
+        <div class="row">
+            {% for ata in atas %}
+            <div class="col-md-6 mb-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="card-title text-dark fw-bold text-truncate" style="max-width: 75%;">{{ ata.assunto }}</h5>
+                                <small class="text-muted">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</small>
+                            </div>
+                            <p class="card-text text-muted small mt-2" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                                {{ ata.topicos }}
+                            </p>
+                        </div>
+                        <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-sm btn-outline-danger fw-bold mt-3 align-self-start">📄 Baixar PDF</a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center py-5 bg-white rounded shadow-sm"><p class="text-muted mb-0 fs-5">Nenhuma ata encontrada.</p></div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+TELA_NOVA_ATA = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Ata | Sistema-JPMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container" style="max-width: 1000px;">
+            <a class="navbar-brand fw-bold" href="/">🚀 JPMS System</a>
+            <div class="d-flex">
+                <a href="/" class="btn btn-outline-light btn-sm me-2">📋 Demandas</a>
+                <a href="/atas" class="btn btn-outline-info btn-sm">📁 Atas de Reunião</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 800px;">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-info text-white p-3">
+                <h4 class="mb-0">Cadastrar Ata de Reunião</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Assunto / Título da Reunião</label>
+                        <input type="text" name="assunto" class="form-control" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Tópicos Discutidos (Um por linha)</label>
+                        <textarea name="topicos" class="form-control" rows="8" placeholder="Pressione Enter para cada novo tópico..." required></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="/atas" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-info text-white fw-bold px-5">Salvar e Gerar PDF</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 # ==========================================
-# 4. ROTAS E LÓGICA DO SISTEMA
+# 5. ROTAS E LÓGICA DO SISTEMA
 # ==========================================
 @app.route('/')
 def index():
-    # Só não mostra as que estão como 'Finalizado'
     demandas_ativas = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_ativas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
@@ -396,7 +438,6 @@ def atualizar(id):
     else:
         demanda.data_conclusao = None
     
-    # Atualiza Checklists
     passos_marcados = request.form.getlist('checklist_passos[]')
     ids_marcados = [int(i) for i in passos_marcados]
     
