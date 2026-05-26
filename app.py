@@ -101,9 +101,6 @@ MENU_INFERIOR = """
 </div>
 """
 
-# ==========================================
-# 4. TEMPLATES HTML COMPATÍVEIS
-# ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -443,25 +440,29 @@ def index():
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
-    # ---------------------------------------------------------
-    # NOVA LÓGICA DO WHATSAPP
-    # ---------------------------------------------------------
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
     texto_whats = "🚀 *RESUMO DE DEMANDAS ATIVAS*\n\n"
-    
     icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
     
     for d in demandas_em_aberto:
         ico = icones.get(d.prioridade, '🔹')
-        # Descobre a data de vencimento real (Prorrogação tem prioridade sobre Prevista)
         vencimento = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
+        
+        # ---------------------------------------------------------
+        # NOVA LÓGICA DE PERCENTUAL NO PYTHON (PARA O ZAP)
+        # ---------------------------------------------------------
+        total_chk = len(d.checklists)
+        concluidos = sum(1 for chk in d.checklists if chk.concluido)
+        percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
+        # ---------------------------------------------------------
         
         texto_whats += f"{ico} *{d.titulo}*\n"
         texto_whats += f"🏢 *Área:* {d.area}\n"
         texto_whats += f"📅 *Vencimento:* {vencimento}\n"
-        texto_whats += f"📊 *Status:* {d.status}\n"
+        # ADICIONADO O PERCENTUAL AQUI DO LADO DO STATUS
+        texto_whats += f"📊 *Status:* {d.status} ({percentual}%)\n"
         texto_whats += "------------------------\n"
         
     if not demandas_em_aberto:
@@ -470,7 +471,6 @@ def index():
     texto_codificado = urllib.parse.quote(texto_whats)
     numero_destino = "5561995414168"
     link_whatsapp = f"https://wa.me/{numero_destino}?text={texto_codificado}"
-    # ---------------------------------------------------------
 
     return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area)
 
