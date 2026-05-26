@@ -26,14 +26,15 @@ db = SQLAlchemy(app)
 class Demanda(db.Model):
     __tablename__ = 'demandas'
     id = db.Column(db.Integer, primary_key=True)
-    titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título') # NOVO CAMPO: TÍTULO
+    titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título')
     area = db.Column(db.String(50), nullable=False)
-    descricao = db.Column(db.Text, nullable=False) # AGORA FUNCIONA COMO OBSERVAÇÃO
+    descricao = db.Column(db.Text, nullable=False)
     prioridade = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
+    data_prorrogacao = db.Column(db.Date, nullable=True) # NOVO CAMPO: PRORROGAÇÃO
     data_conclusao = db.Column(db.Date, nullable=True)
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
@@ -51,11 +52,11 @@ class AtaReuniao(db.Model):
     data_criacao = db.Column(db.Date, default=datetime.utcnow().date)
     topicos = db.Column(db.Text, nullable=False)
 
-# Auto-atualização do banco para não precisar apagar o Postgres de novo
+# Automação para criar a nova coluna no banco de dados existente
 with app.app_context():
     db.create_all()
     try:
-        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS titulo VARCHAR(150) DEFAULT 'Demanda Antiga';"))
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS data_prorrogacao DATE;"))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -82,6 +83,10 @@ ESTILO_APP = """
     .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; font-size: 0.95rem; }
     .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.25rem rgba(0,122,255,0.1); }
     .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; font-size: 0.95rem; }
+    
+    /* Esconder Scrollbar no Menu de Áreas */
+    .scroll-menu::-webkit-scrollbar { display: none; }
+    .scroll-menu { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 """
@@ -100,7 +105,7 @@ MENU_INFERIOR = """
 """
 
 # ==========================================
-# 4. TEMPLATES HTML
+# 4. TEMPLATES HTML COMPATÍVEIS
 # ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
@@ -114,16 +119,21 @@ TELA_PRINCIPAL = """
     <div class="app-header">🚀 JPMS System</div>
     
     <div class="container-app mt-3">
-        <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-3 shadow-sm">
-            <i class="bi bi-whatsapp"></i> Enviar Resumo no WhatsApp
-        </a>
-        
-        <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex justify-content-center mb-2">
             <div class="btn-group w-100 shadow-sm" style="border-radius: 12px; overflow: hidden; border: 1px solid #e5e5ea;">
-                <a href="/?status=Pendente" class="btn btn-sm {% if filtro == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">⏳ Pendentes</a>
-                <a href="/?status=Iniciado" class="btn btn-sm {% if filtro == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">🚀 Iniciados</a>
-                <a href="/?status=Finalizado" class="btn btn-sm {% if filtro == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">✅ Finalizados</a>
+                <a href="/?status=Pendente&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">⏳ Pendentes</a>
+                <a href="/?status=Iniciado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">🚀 Iniciados</a>
+                <a href="/?status=Finalizado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">✅ Finalizados</a>
             </div>
+        </div>
+        
+        <div class="d-flex overflow-auto mb-4 pb-1 scroll-menu" style="gap: 8px; white-space: nowrap;">
+            <a href="/?status={{ filtro_status }}&area=Todas" class="btn btn-sm {% if filtro_area == 'Todas' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">Todas</a>
+            <a href="/?status={{ filtro_status }}&area=CODER" class="btn btn-sm {% if filtro_area == 'CODER' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">CODER</a>
+            <a href="/?status={{ filtro_status }}&area=COCAP" class="btn btn-sm {% if filtro_area == 'COCAP' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">COCAP</a>
+            <a href="/?status={{ filtro_status }}&area=CONEC" class="btn btn-sm {% if filtro_area == 'CONEC' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">CONEC</a>
+            <a href="/?status={{ filtro_status }}&area=GERED" class="btn btn-sm {% if filtro_area == 'GERED' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">GERED</a>
+            <a href="/?status={{ filtro_status }}&area=EXTERNO" class="btn btn-sm {% if filtro_area == 'EXTERNO' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">EXTERNO</a>
         </div>
         
         <div class="accordion" id="accordionDemandas">
@@ -156,27 +166,47 @@ TELA_PRINCIPAL = """
                                 {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary">Iniciado</span>
                                 {% else %}<span class="badge bg-secondary">Pendente</span>{% endif %}
                             </div>
-                            <small class="text-danger fw-bold d-block" style="font-size: 0.7rem;">📅 {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
+                            <small class="text-danger fw-bold d-block" style="font-size: 0.7rem;">📅 P: {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
+                            {% if demanda.data_prorrogacao %}
+                                <small class="text-warning text-dark fw-bold d-block" style="font-size: 0.7rem;">⏳ PR: {{ demanda.data_prorrogacao.strftime('%d/%m/%Y') }}</small>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 
                 <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
                     <div class="card-body p-3 border-top">
-                        <form action="/atualizar/{{ demanda.id }}?origem={{ filtro }}" method="POST">
-                            <label class="form-label fw-bold text-secondary small">Status da Demanda</label>
-                            <select name="status" class="form-select form-select-sm mb-3 border-primary shadow-sm">
-                                <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
-                                <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>🚀 Iniciado</option>
-                                <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
-                            </select>
+                        <form action="/atualizar/{{ demanda.id }}?status={{ filtro_status }}&area={{ filtro_area }}" method="POST">
                             
-                            <div class="bg-light p-3 rounded mb-3 border">
-                                <span class="badge bg-secondary mb-2">Observações / Detalhes</span>
-                                <small class="text-dark d-block" style="white-space: pre-wrap;">{{ demanda.descricao }}</small>
+                            <div class="row mb-2">
+                                <div class="col-12 mb-2">
+                                    <label class="form-label fw-bold text-secondary small mb-1">Status da Demanda</label>
+                                    <select name="status" class="form-select form-select-sm border-primary shadow-sm">
+                                        <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
+                                        <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>🚀 Iniciado</option>
+                                        <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <label class="form-label fw-bold text-secondary small mb-1">Data Início</label>
+                                    <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ demanda.data_inicio.strftime('%Y-%m-%d') if demanda.data_inicio else '' }}">
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <label class="form-label fw-bold text-warning text-dark small mb-1">Prorrogação</label>
+                                    <input type="date" name="data_prorrogacao" class="form-control form-control-sm border-warning" value="{{ demanda.data_prorrogacao.strftime('%Y-%m-%d') if demanda.data_prorrogacao else '' }}">
+                                </div>
                             </div>
                             
-                            <h6 class="fw-bold text-secondary mb-2 small">Progresso do Checklist</h6>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary small mb-1">Observações / Detalhes (Editável)</label>
+                                <textarea name="descricao" class="form-control form-control-sm border" rows="4">{{ demanda.descricao }}</textarea>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-secondary m-0 small">Progresso Checklist</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="addChkEdit({{ demanda.id }})">+ Item</button>
+                            </div>
+                            
                             <div class="d-flex align-items-center mb-3">
                                 <div class="progress flex-grow-1 me-2 rounded-pill" style="height: 10px;">
                                     <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-primary{% endif %} rounded-pill" style="width: {{ percentual }}%;"></div>
@@ -186,15 +216,16 @@ TELA_PRINCIPAL = """
 
                             <div class="mb-4">
                                 {% for chk in demanda.checklists %}
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" name="checklist_passos[]" value="{{ chk.id }}" id="chk{{ chk.id }}" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.15); margin-right: 6px;">
-                                    <label class="form-check-label {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" for="chk{{ chk.id }}">{{ chk.passo }}</label>
+                                <div class="d-flex align-items-center mb-2">
+                                    <input class="form-check-input mt-0 me-2 border-secondary" type="checkbox" name="chk_status_{{ chk.id }}" value="1" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.15);">
+                                    <input type="text" name="chk_texto_{{ chk.id }}" class="form-control form-control-sm {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" value="{{ chk.passo }}" style="border: 1px dashed transparent; background: transparent; transition: 0.3s;" onfocus="this.style.border='1px dashed #ccc'; this.style.background='#fff';" onblur="this.style.border='1px dashed transparent'; this.style.background='transparent';">
                                 </div>
                                 {% else %}
                                 <p class="text-muted small">Nenhuma subetapa cadastrada.</p>
                                 {% endfor %}
+                                <div id="new-chk-container-{{ demanda.id }}"></div>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-app w-100">💾 Salvar Alterações</button>
+                            <button type="submit" class="btn btn-primary btn-app w-100 shadow-sm">💾 Salvar Modificações</button>
                         </form>
                     </div>
                 </div>
@@ -202,7 +233,7 @@ TELA_PRINCIPAL = """
             {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-inbox fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma demanda nesta categoria! 🎉</p>
+                <p class="text-muted mt-2">Nenhuma demanda neste filtro! 🎉</p>
             </div>
             {% endfor %}
         </div>
@@ -210,6 +241,17 @@ TELA_PRINCIPAL = """
     
     <a href="/nova_demanda" class="fab"><i class="bi bi-plus-lg"></i></a>
     """ + MENU_INFERIOR + """
+    
+    <script>
+        function addChkEdit(id) {
+            const container = document.getElementById('new-chk-container-' + id);
+            const div = document.createElement('div');
+            div.className = 'd-flex align-items-center mb-2';
+            div.innerHTML = `<span class="me-2 text-primary" style="width: 16px;"><i class="bi bi-dot"></i></span>
+                             <input type="text" name="novo_passo[]" class="form-control form-control-sm border-primary" placeholder="Novo item da etapa...">`;
+            container.appendChild(div);
+        }
+    </script>
 </body>
 </html>
 """
@@ -269,7 +311,7 @@ TELA_NOVA_DEMANDA = """
                 </div>
                 <div class="col-6">
                     <label class="form-label fw-bold text-danger small">Previsão Fim</label>
-                    <input type="date" name="data_prevista" class="form-control" required>
+                    <input type="date" name="data_prevista" class="form-control border-danger" required>
                 </div>
             </div>
             
@@ -389,12 +431,19 @@ TELA_NOVA_ATA = """
 # ==========================================
 @app.route('/')
 def index():
-    filtro = request.args.get('status', 'Pendente')
+    filtro_status = request.args.get('status', 'Pendente')
+    filtro_area = request.args.get('area', 'Todas')
     
-    demandas_filtradas = Demanda.query.filter(Demanda.status == filtro).all()
+    # Monta a pesquisa no banco de dados
+    query = Demanda.query.filter(Demanda.status == filtro_status)
+    if filtro_area != 'Todas':
+        query = query.filter(Demanda.area == filtro_area)
+        
+    demandas_filtradas = query.all()
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
+    # Resumo no WhatsApp (Todas em aberto, ignorando filtro visual)
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
@@ -404,24 +453,24 @@ def index():
     
     for d in demandas_em_aberto:
         ico = icones.get(d.prioridade, '🔹')
-        # WHATSAPP AGORA MOSTRA O TÍTULO!
         texto_whats += f"{ico} *[{d.prioridade.upper()}]* {d.titulo}\n"
-        texto_whats += f"└ *Setor:* {d.area} | *Prev:* {d.data_prevista.strftime('%d/%m/%Y')} | *Status:* {d.status}\n\n"
+        prorrog = f" | *Prorrogado:* {d.data_prorrogacao.strftime('%d/%m/%Y')}" if d.data_prorrogacao else ""
+        texto_whats += f"└ *Setor:* {d.area} | *Prev:* {d.data_prevista.strftime('%d/%m/%Y')}{prorrog} | *Status:* {d.status}\n\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/?text={texto_codificado}"
     
-    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro=filtro)
+    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
     if request.method == 'POST':
         nova_dem = Demanda(
-            titulo=request.form.get('titulo', 'Sem título'), # NOVO CAMPO SALVANDO
+            titulo=request.form.get('titulo', 'Sem título'),
             area=request.form['area'], 
             descricao=request.form['descricao'], 
             prioridade=request.form['prioridade'], 
-            data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form['data_inicio'] else None, 
+            data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, 
             data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
         )
         db.session.add(nova_dem)
@@ -436,22 +485,40 @@ def nova_demanda():
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
-    demanda.status = request.form.get('status')
-    origem = request.args.get('origem', 'Pendente')
+    origem_status = request.args.get('status', 'Pendente')
+    origem_area = request.args.get('area', 'Todas')
+    
+    # Atualiza Status e Descrição
+    demanda.status = request.form.get('status', demanda.status)
+    demanda.descricao = request.form.get('descricao', demanda.descricao)
+    
+    # Atualiza Datas
+    d_inicio = request.form.get('data_inicio')
+    demanda.data_inicio = datetime.strptime(d_inicio, '%Y-%m-%d').date() if d_inicio else None
+    
+    d_prorrog = request.form.get('data_prorrogacao')
+    demanda.data_prorrogacao = datetime.strptime(d_prorrog, '%Y-%m-%d').date() if d_prorrog else None
     
     if demanda.status == 'Finalizado':
         demanda.data_conclusao = datetime.utcnow().date()
     else:
         demanda.data_conclusao = None
     
-    passos_marcados = request.form.getlist('checklist_passos[]')
-    ids_marcados = [int(i) for i in passos_marcados]
-    
+    # Atualiza Checklist Existente
     for chk in demanda.checklists:
-        chk.concluido = chk.id in ids_marcados
-        
+        chk.concluido = f'chk_status_{chk.id}' in request.form
+        novo_texto = request.form.get(f'chk_texto_{chk.id}')
+        if novo_texto:
+            chk.passo = novo_texto
+            
+    # Adiciona Novos Itens ao Checklist
+    novos_passos = request.form.getlist('novo_passo[]')
+    for np in novos_passos:
+        if np.strip():
+            db.session.add(Checklist(demanda_id=demanda.id, passo=np.strip()))
+            
     db.session.commit()
-    return redirect(url_for('index', status=origem))
+    return redirect(url_for('index', status=origem_status, area=origem_area))
 
 @app.route('/atas')
 def lista_atas():
@@ -482,7 +549,6 @@ def gerar_pdf_ata(id):
             return str(texto).encode('latin-1', 'replace').decode('latin-1')
         
         pdf.set_font("helvetica", style="B", size=16)
-        
         titulo_completo = limpa_texto(f"Ata de Reunião: {ata.assunto}")
         linhas_titulo = textwrap.wrap(titulo_completo, width=45, break_long_words=True)
         for linha_t in linhas_titulo:
@@ -497,7 +563,6 @@ def gerar_pdf_ata(id):
         pdf.ln(5)
         
         pdf.set_font("helvetica", size=11)
-        
         contador = 1
         for linha in ata.topicos.split('\n'):
             linha_limpa = linha.strip()
