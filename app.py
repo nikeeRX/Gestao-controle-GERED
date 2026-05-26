@@ -34,7 +34,7 @@ class Demanda(db.Model):
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
     data_prevista = db.Column(db.Date, nullable=False)
-    data_prorrogacao = db.Column(db.Date, nullable=True) # NOVO CAMPO: PRORROGAÇÃO
+    data_prorrogacao = db.Column(db.Date, nullable=True) 
     data_conclusao = db.Column(db.Date, nullable=True)
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
@@ -52,7 +52,6 @@ class AtaReuniao(db.Model):
     data_criacao = db.Column(db.Date, default=datetime.utcnow().date)
     topicos = db.Column(db.Text, nullable=False)
 
-# Automação para criar a nova coluna no banco de dados existente
 with app.app_context():
     db.create_all()
     try:
@@ -83,8 +82,6 @@ ESTILO_APP = """
     .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e5e5ea; background-color: #fcfcfc; font-size: 0.95rem; }
     .form-control:focus, .form-select:focus { border-color: #007aff; box-shadow: 0 0 0 0.25rem rgba(0,122,255,0.1); }
     .btn-app { border-radius: 12px; padding: 12px; font-weight: 600; font-size: 0.95rem; }
-    
-    /* Esconder Scrollbar no Menu de Áreas */
     .scroll-menu::-webkit-scrollbar { display: none; }
     .scroll-menu { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
@@ -127,7 +124,7 @@ TELA_PRINCIPAL = """
             </div>
         </div>
         
-        <div class="d-flex overflow-auto mb-4 pb-1 scroll-menu" style="gap: 8px; white-space: nowrap;">
+        <div class="d-flex overflow-auto mb-3 pb-1 scroll-menu" style="gap: 8px; white-space: nowrap;">
             <a href="/?status={{ filtro_status }}&area=Todas" class="btn btn-sm {% if filtro_area == 'Todas' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">Todas</a>
             <a href="/?status={{ filtro_status }}&area=CODER" class="btn btn-sm {% if filtro_area == 'CODER' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">CODER</a>
             <a href="/?status={{ filtro_status }}&area=COCAP" class="btn btn-sm {% if filtro_area == 'COCAP' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">COCAP</a>
@@ -135,6 +132,10 @@ TELA_PRINCIPAL = """
             <a href="/?status={{ filtro_status }}&area=GERED" class="btn btn-sm {% if filtro_area == 'GERED' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">GERED</a>
             <a href="/?status={{ filtro_status }}&area=EXTERNO" class="btn btn-sm {% if filtro_area == 'EXTERNO' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">EXTERNO</a>
         </div>
+        
+        <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-4 shadow-sm" style="border-radius: 16px;">
+            <i class="bi bi-whatsapp"></i> Enviar Resumo Zap
+        </a>
         
         <div class="accordion" id="accordionDemandas">
             {% for demanda in demandas %}
@@ -434,7 +435,6 @@ def index():
     filtro_status = request.args.get('status', 'Pendente')
     filtro_area = request.args.get('area', 'Todas')
     
-    # Monta a pesquisa no banco de dados
     query = Demanda.query.filter(Demanda.status == filtro_status)
     if filtro_area != 'Todas':
         query = query.filter(Demanda.area == filtro_area)
@@ -443,23 +443,35 @@ def index():
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
-    # Resumo no WhatsApp (Todas em aberto, ignorando filtro visual)
+    # ---------------------------------------------------------
+    # NOVA LÓGICA DO WHATSAPP
+    # ---------------------------------------------------------
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
-    texto_whats = "🚀 *RESUMO DIÁRIO - DEMANDAS EM ABERTO*\n\n"
-    texto_whats += f"Temos *{len(demandas_em_aberto)} demandas* pendentes:\n\n"
+    texto_whats = "🚀 *RESUMO DE DEMANDAS ATIVAS*\n\n"
+    
     icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
     
     for d in demandas_em_aberto:
         ico = icones.get(d.prioridade, '🔹')
-        texto_whats += f"{ico} *[{d.prioridade.upper()}]* {d.titulo}\n"
-        prorrog = f" | *Prorrogado:* {d.data_prorrogacao.strftime('%d/%m/%Y')}" if d.data_prorrogacao else ""
-        texto_whats += f"└ *Setor:* {d.area} | *Prev:* {d.data_prevista.strftime('%d/%m/%Y')}{prorrog} | *Status:* {d.status}\n\n"
+        # Descobre a data de vencimento real (Prorrogação tem prioridade sobre Prevista)
+        vencimento = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
+        
+        texto_whats += f"{ico} *{d.titulo}*\n"
+        texto_whats += f"🏢 *Área:* {d.area}\n"
+        texto_whats += f"📅 *Vencimento:* {vencimento}\n"
+        texto_whats += f"📊 *Status:* {d.status}\n"
+        texto_whats += "------------------------\n"
+        
+    if not demandas_em_aberto:
+        texto_whats += "✅ Nenhuma demanda pendente no momento!\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
-    link_whatsapp = f"https://wa.me/?text={texto_codificado}"
-    
+    numero_destino = "5561995414168"
+    link_whatsapp = f"https://wa.me/{numero_destino}?text={texto_codificado}"
+    # ---------------------------------------------------------
+
     return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
@@ -488,11 +500,9 @@ def atualizar(id):
     origem_status = request.args.get('status', 'Pendente')
     origem_area = request.args.get('area', 'Todas')
     
-    # Atualiza Status e Descrição
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
-    # Atualiza Datas
     d_inicio = request.form.get('data_inicio')
     demanda.data_inicio = datetime.strptime(d_inicio, '%Y-%m-%d').date() if d_inicio else None
     
@@ -504,14 +514,12 @@ def atualizar(id):
     else:
         demanda.data_conclusao = None
     
-    # Atualiza Checklist Existente
     for chk in demanda.checklists:
         chk.concluido = f'chk_status_{chk.id}' in request.form
         novo_texto = request.form.get(f'chk_texto_{chk.id}')
         if novo_texto:
             chk.passo = novo_texto
             
-    # Adiciona Novos Itens ao Checklist
     novos_passos = request.form.getlist('novo_passo[]')
     for np in novos_passos:
         if np.strip():
