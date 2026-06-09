@@ -101,6 +101,9 @@ MENU_INFERIOR = """
 </div>
 """
 
+# ==========================================
+# 4. TEMPLATES HTML COMPATÍVEIS
+# ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -177,7 +180,17 @@ TELA_PRINCIPAL = """
                         <form action="/atualizar/{{ demanda.id }}?status={{ filtro_status }}&area={{ filtro_area }}" method="POST">
                             
                             <div class="row mb-2">
-                                <div class="col-12 mb-2">
+                                <div class="col-6 mb-2">
+                                    <label class="form-label fw-bold text-secondary small mb-1">Área / Setor Responsável</label>
+                                    <select name="area" class="form-select form-select-sm border-primary shadow-sm">
+                                        <option value="CODER" {% if demanda.area == 'CODER' %}selected{% endif %}>CODER</option>
+                                        <option value="COCAP" {% if demanda.area == 'COCAP' %}selected{% endif %}>COCAP</option>
+                                        <option value="CONEC" {% if demanda.area == 'CONEC' %}selected{% endif %}>CONEC</option>
+                                        <option value="GERED" {% if demanda.area == 'GERED' %}selected{% endif %}>GERED</option>
+                                        <option value="EXTERNO" {% if demanda.area == 'EXTERNO' %}selected{% endif %}>EXTERNO</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 mb-2">
                                     <label class="form-label fw-bold text-secondary small mb-1">Status da Demanda</label>
                                     <select name="status" class="form-select form-select-sm border-primary shadow-sm">
                                         <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
@@ -440,33 +453,49 @@ def index():
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
     demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
     
+    # ---------------------------------------------------------
+    # WHATSAPP REESTRUTURADO E SEPARADO POR SEÇÕES VISUAIS
+    # ---------------------------------------------------------
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
-    demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
+    demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prorrogacao or x.data_prevista))
     
-    texto_whats = "🚀 *RESUMO DE DEMANDAS ATIVAS*\n\n"
+    criticas = [d for d in demandas_em_aberto if d.prioridade in ['Extremo', 'Alto']]
+    demais = [d for d in demandas_em_aberto if d.prioridade in ['Médio', 'Mínimo']]
+    
+    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS*\n"
+    texto_whats += "=============================\n\n"
     icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
     
-    for d in demandas_em_aberto:
-        ico = icones.get(d.prioridade, '🔹')
-        vencimento = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
-        
-        # ---------------------------------------------------------
-        # NOVA LÓGICA DE PERCENTUAL NO PYTHON (PARA O ZAP)
-        # ---------------------------------------------------------
-        total_chk = len(d.checklists)
-        concluidos = sum(1 for chk in d.checklists if chk.concluido)
-        percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
-        # ---------------------------------------------------------
-        
-        texto_whats += f"{ico} *{d.titulo}*\n"
-        texto_whats += f"🏢 *Área:* {d.area}\n"
-        texto_whats += f"📅 *Vencimento:* {vencimento}\n"
-        # ADICIONADO O PERCENTUAL AQUI DO LADO DO STATUS
-        texto_whats += f"📊 *Status:* {d.status} ({percentual}%)\n"
-        texto_whats += "------------------------\n"
+    if criticas:
+        texto_whats += "🔥 *CRÍTICAS / ALTA PRIORIDADE*\n"
+        texto_whats += "-----------------------------\n"
+        for d in criticas:
+            ico = icones.get(d.prioridade, '🔹')
+            venc = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
+            total_chk = len(d.checklists)
+            concluidos = sum(1 for chk in d.checklists if chk.concluido)
+            percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
+            
+            texto_whats += f"{ico} *{d.titulo}*\n"
+            texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
+            texto_whats += f"└ *Status:* {d.status} ({percentual}%)\n\n"
+            
+    if demais:
+        texto_whats += "🗓️ *PENDÊNCIAS E EM ANDAMENTO*\n"
+        texto_whats += "-----------------------------\n"
+        for d in demais:
+            ico = icones.get(d.prioridade, '🔹')
+            venc = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
+            total_chk = len(d.checklists)
+            concluidos = sum(1 for chk in d.checklists if chk.concluido)
+            percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
+            
+            texto_whats += f"{ico} *{d.titulo}*\n"
+            texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
+            texto_whats += f"└ *Status:* {d.status} ({percentual}%)\n\n"
         
     if not demandas_em_aberto:
-        texto_whats += "✅ Nenhuma demanda pendente no momento!\n"
+        texto_whats += "✅ Nenhuma demanda ativa no momento!\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
     numero_destino = "5561995414168"
@@ -500,6 +529,8 @@ def atualizar(id):
     origem_status = request.args.get('status', 'Pendente')
     origem_area = request.args.get('area', 'Todas')
     
+    # ATUALIZA MUDANÇA DE SETOR (ÁREA) DO CARD CASO ENVIADA
+    demanda.area = request.form.get('area', demanda.area)
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
@@ -574,7 +605,7 @@ def gerar_pdf_ata(id):
         contador = 1
         for linha in ata.topicos.split('\n'):
             linha_limpa = linha.strip()
-            if linha_limpa:
+            if línea_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
                 for pedaco in linhas_quebradas:
