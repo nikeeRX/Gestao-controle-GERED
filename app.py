@@ -162,14 +162,19 @@ TELA_PRINCIPAL = """
                         <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
                             
-                            {% if demanda.prio_num <= 3 %}
-                                <span class="badge bg-danger">🔴 Posição {{ demanda.prio_num }}</span>
-                            {% elif demanda.prio_num >= 4 and demanda.prio_num <= 6 %}
-                                <span class="badge bg-warning text-dark">🟡 Posição {{ demanda.prio_num }}</span>
-                            {% elif demanda.prio_num >= 7 and demanda.prio_num <= 10 %}
-                                <span class="badge bg-success">🟢 Posição {{ demanda.prio_num }}</span>
+                            <!-- EXCLUI NUMERO DE PRIORIDADE SE FOR FINALIZADO -->
+                            {% if demanda.status == 'Finalizado' %}
+                                <span class="badge bg-secondary">✅ Arquivado</span>
                             {% else %}
-                                <span class="badge bg-primary">🔵 Posição {{ demanda.prio_num }}</span>
+                                {% if demanda.prio_num <= 3 %}
+                                    <span class="badge bg-danger">🔴 Posição {{ demanda.prio_num }}</span>
+                                {% elif demanda.prio_num >= 4 and demanda.prio_num <= 6 %}
+                                    <span class="badge bg-warning text-dark">🟡 Posição {{ demanda.prio_num }}</span>
+                                {% elif demanda.prio_num >= 7 and demanda.prio_num <= 10 %}
+                                    <span class="badge bg-success">🟢 Posição {{ demanda.prio_num }}</span>
+                                {% else %}
+                                    <span class="badge bg-primary">🔵 Posição {{ demanda.prio_num }}</span>
+                                {% endif %}
                             {% endif %}
                             
                             <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
@@ -208,10 +213,13 @@ TELA_PRINCIPAL = """
                                 </div>
                                 
                                 <div class="col-12">
-                                    <label class="small fw-bold text-primary">Alterar Posição de Prioridade (1-15)</label>
+                                    <label class="small fw-bold text-primary">Alterar Posição (1-15)</label>
                                     <select name="prioridade" class="form-select form-select-sm border-primary">
+                                        {% if demanda.status == 'Finalizado' %}
+                                            <option value="{{ demanda.prioridade }}" selected>✅ Posição Liberada (Escolha para reativar)</option>
+                                        {% endif %}
                                         {% for n in range(1, 16) %}
-                                            {% if n == demanda.prio_num %}
+                                            {% if n == demanda.prio_num and demanda.status != 'Finalizado' %}
                                                 <option value="{{ n }}" selected>⭐ Posição {{ n }} (Atual)</option>
                                             {% elif n not in ocupados_global %}
                                                 <option value="{{ n }}">🔢 Posição {{ n }}</option>
@@ -249,7 +257,7 @@ TELA_PRINCIPAL = """
                             
                             <div class="d-flex gap-2">
                                 <button type="submit" class="btn btn-primary btn-app flex-grow-1 shadow-sm">💾 Salvar Modificações</button>
-                                <button type="submit" form="form-deletar-{{ demanda.id }}" class="btn btn-outline-danger btn-app shadow-sm px-3" onclick="return confirm('Mano, quer mesmo apagar essa demanda de forma permanente do sistema?')">
+                                <button type="submit" form="form-deletar-{{ demanda.id }}" class="btn btn-outline-danger btn-app shadow-sm px-3" onclick="return confirm('Tem certeza que deseja apagar permanentemente esta demanda?')">
                                     <i class="bi bi-trash3-fill"></i>
                                 </button>
                             </div>
@@ -402,12 +410,12 @@ TELA_NOVA_ATA = """
 # ==========================================
 @app.route('/')
 def index():
-    filtro_status = request.args.get('status', 'Pendente')
+    filtro_status = request.args.get('status', 'Todos')
     filtro_area = request.args.get('area', 'Todas')
     
-    # AJUSTE ADICIONADO: Se for 'Todos', pula o filtro de status da query
+    # SE FOR "TODOS", ESCONDE O QUE FOR "FINALIZADO" (ARQUIVADO)
     if filtro_status == 'Todos':
-        query = Demanda.query
+        query = Demanda.query.filter(Demanda.status != 'Finalizado')
     else:
         query = Demanda.query.filter(Demanda.status == filtro_status)
         
@@ -419,7 +427,6 @@ def index():
     
     ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
     
-    # Relatório unificado WhatsApp permanece inalterado varrendo o que estiver ativo
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (x.prio_num, x.data_sort))
     
@@ -466,7 +473,7 @@ def nova_demanda():
         for passo in request.form.getlist('passo_checklist[]'):
             if passo.strip(): db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('index', status='Todos'))
         
     ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
     return render_template_string(TELA_NOVA_DEMANDA, ocupados=ocupados)
@@ -474,7 +481,7 @@ def nova_demanda():
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
-    origem_status = request.args.get('status', 'Pendente')
+    origem_status = request.args.get('status', 'Todos')
     origem_area = request.args.get('area', 'Todas')
     
     demanda.area = request.form.get('area', demanda.area)
@@ -498,13 +505,10 @@ def atualizar(id):
     db.session.commit()
     return redirect(url_for('index', status=origem_status, area=origem_area))
 
-# ==========================================
-# ROTA ADICIONADA: EXCLUIR DEMANDA DO BANCO
-# ==========================================
 @app.route('/deletar/<int:id>', methods=['POST'])
 def deletar(id):
     demanda = Demanda.query.get_or_404(id)
-    origem_status = request.args.get('status', 'Pendente')
+    origem_status = request.args.get('status', 'Todos')
     origem_area = request.args.get('area', 'Todas')
     
     db.session.delete(demanda)
