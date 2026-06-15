@@ -29,7 +29,6 @@ class Demanda(db.Model):
     titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título')
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
-    # Mantido como String para não quebrar chamados antigos. O Python fará a conversão!
     prioridade = db.Column(db.String(20), nullable=False, default='50') 
     status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
@@ -39,16 +38,15 @@ class Demanda(db.Model):
     data_conclusao = db.Column(db.Date, nullable=True)
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
-    # Tradutor Automático: Converte texto velho em número novo sem tocar no banco
+    # Converte de forma segura textos antigos em números para ordenação e cores
     @property
     def prio_num(self):
         try:
             return int(self.prioridade)
         except (ValueError, TypeError):
-            mapa = {'Extremo': 1, 'Alto': 10, 'Médio': 20, 'Mínimo': 30}
+            mapa = {'Extremo': 1, 'Alto': 5, 'Médio': 15, 'Mínimo': 30}
             return mapa.get(str(self.prioridade), 50)
             
-    # Prevenção contra datas antigas corrompidas
     @property
     def data_sort(self):
         dt = self.data_prorrogacao or self.data_prevista
@@ -70,7 +68,6 @@ class AtaReuniao(db.Model):
 
 with app.app_context():
     db.create_all()
-    # Adiciona a coluna nova de forma 100% segura sem apagar nada
     try:
         db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS data_prorrogacao DATE;"))
         db.session.commit()
@@ -163,7 +160,15 @@ TELA_PRINCIPAL = """
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
-                            <span class="badge bg-danger">⭐ Posição {{ demanda.prio_num }}</span>
+                            
+                            {% if demanda.prio_num <= 3 %}
+                                <span class="badge bg-danger">🔴 Posição {{ demanda.prio_num }}</span>
+                            {% elif demanda.prio_num >= 4 and demanda.prio_num <= 6 %}
+                                <span class="badge bg-warning text-dark">🟡 Posição {{ demanda.prio_num }}</span>
+                            {% else %}
+                                <span class="badge bg-success">🟢 Posição {{ demanda.prio_num }}</span>
+                            {% endif %}
+                            
                             <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
                         </div>
                         <div class="text-end" style="min-width: 110px;">
@@ -171,10 +176,7 @@ TELA_PRINCIPAL = """
                                 <span class="badge bg-light text-dark border me-1">{{ percentual }}%</span>
                                 <span class="badge {% if demanda.status == 'Finalizado' %}bg-success{% elif demanda.status == 'Iniciado' %}bg-primary{% else %}bg-secondary{% endif %}">{{ demanda.status }}</span>
                             </div>
-                            <small class="text-danger fw-bold d-block">📅 P: {{ demanda.data_prevista.strftime('%d/%m/%Y') if demanda.data_prevista else 'S/D' }}</small>
-                            {% if demanda.data_prorrogacao %}
-                                <small class="text-warning text-dark fw-bold d-block" style="font-size: 0.7rem;">⏳ PR: {{ demanda.data_prorrogacao.strftime('%d/%m/%Y') }}</small>
-                            {% endif %}
+                            <small class="text-danger fw-bold d-block">📅 {{ (demanda.data_prorrogacao or demanda.data_prevista).strftime('%d/%m/%Y') if (demanda.data_prorrogacao or demanda.data_prevista) else 'S/D' }}</small>
                         </div>
                     </div>
                 </div>
@@ -201,7 +203,7 @@ TELA_PRINCIPAL = """
                                 </div>
                                 
                                 <div class="col-12">
-                                    <label class="small fw-bold text-primary">Alterar Posição (1-50)</label>
+                                    <label class="small fw-bold text-primary">Alterar Posição de Prioridade (1-50)</label>
                                     <select name="prioridade" class="form-select form-select-sm border-primary">
                                         {% for n in range(1, 51) %}
                                             {% if n == demanda.prio_num %}
@@ -291,7 +293,6 @@ TELA_NOVA_DEMANDA = """
                         {% endfor %}
                     </select>
                 </div>
-                
                 <div class="col-6">
                     <label class="fw-bold small text-primary">Posição de Prioridade</label>
                     <select name="prioridade" class="form-select border-primary" required>
@@ -397,10 +398,9 @@ def index():
     if filtro_area != 'Todas': query = query.filter(Demanda.area == filtro_area)
     demandas_filtradas = query.all()
     
-    # ORDENAÇÃO BLINDADA: Lê o tradutor numérico seguro e depois a data
     demandas_filtradas.sort(key=lambda x: (x.prio_num, x.data_sort))
     
-    # Numeração Ocupada
+    # Numeração Ocupada enviada para o template travar repetição
     ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
     
     # Relatório WhatsApp
@@ -416,7 +416,10 @@ def index():
         concluidos = sum(1 for chk in d.checklists if chk.concluido)
         perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
         
-        texto_whats += f"⭐ *Posição [{d.prio_num}]* - {d.titulo}\n"
+        # Define emoji do semáforo baseado na prioridade numérica para o Zap também
+        bloco_ico = "🔴" if d.prio_num <= 3 else ("🟡" if d.prio_num <= 6 else "🟢")
+        
+        texto_whats += f"{bloco_ico} *Posição [{d.prio_num}]* - {d.titulo}\n"
         texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
         texto_whats += f"└ *Status:* {d.status} ({perc}%)\n"
         texto_whats += "-----------------------------------------\n"
@@ -436,7 +439,7 @@ def nova_demanda():
             titulo=request.form.get('titulo'), 
             area=request.form['area'], 
             descricao=request.form['descricao'], 
-            prioridade=str(request.form['prioridade']), # Salva o número em formato de texto para manter padrão do DB
+            prioridade=str(request.form['prioridade']), 
             data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, 
             data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
         )
@@ -458,6 +461,7 @@ def atualizar(id):
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
+    # Captura a nova prioridade na alteração de forma segura
     nova_prio = request.form.get('prioridade')
     if nova_prio:
         demanda.prioridade = str(nova_prio)
@@ -517,7 +521,7 @@ def gerar_pdf_ata(id):
             if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
-                for pedaco in linhas_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
+                for pedaco in lines_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
                 contador += 1
         pdf_bytes = bytes(pdf.output())
         return send_file(io.BytesIO(pdf_bytes), as_attachment=True, download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", mimetype='application/pdf')
