@@ -29,7 +29,7 @@ class Demanda(db.Model):
     titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título')
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
-    prioridade = db.Column(db.String(20), nullable=False, default='15') # Limite padrão ajustado para 15
+    prioridade = db.Column(db.String(20), nullable=False, default='15') 
     status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
@@ -38,7 +38,6 @@ class Demanda(db.Model):
     data_conclusao = db.Column(db.Date, nullable=True)
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
-    # Converte textos e números antigos com segurança limitando ao topo 15
     @property
     def prio_num(self):
         try:
@@ -133,9 +132,10 @@ TELA_PRINCIPAL = """
     <div class="container-app mt-3">
         <div class="d-flex justify-content-center mb-2">
             <div class="btn-group w-100 shadow-sm" style="border-radius: 12px; overflow: hidden; border: 1px solid #e5e5ea;">
-                <a href="/?status=Pendente&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">⏳ Pendentes</a>
-                <a href="/?status=Iniciado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">🚀 Iniciados</a>
-                <a href="/?status=Finalizado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">✅ Finalizados</a>
+                <a href="/?status=Todos&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Todos' %}btn-dark text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.8rem;">📋 Todos</a>
+                <a href="/?status=Pendente&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.8rem;">⏳ Pendentes</a>
+                <a href="/?status=Iniciado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.8rem;">🚀 Iniciados</a>
+                <a href="/?status=Finalizado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.8rem;">✅ Finalizados</a>
             </div>
         </div>
         
@@ -186,6 +186,8 @@ TELA_PRINCIPAL = """
                 
                 <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
                     <div class="card-body p-3 border-top">
+                        <form id="form-deletar-{{ demanda.id }}" action="/deletar/{{ demanda.id }}?status={{ filtro_status }}&area={{ filtro_area }}" method="POST" style="display:none;"></form>
+
                         <form action="/atualizar/{{ demanda.id }}?status={{ filtro_status }}&area={{ filtro_area }}" method="POST">
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
@@ -244,7 +246,13 @@ TELA_PRINCIPAL = """
                                 {% endfor %}
                                 <div id="new-chk-container-{{ demanda.id }}"></div>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-app w-100 shadow-sm">💾 Salvar Modificações</button>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary btn-app flex-grow-1 shadow-sm">💾 Salvar Modificações</button>
+                                <button type="submit" form="form-deletar-{{ demanda.id }}" class="btn btn-outline-danger btn-app shadow-sm px-3" onclick="return confirm('Mano, quer mesmo apagar essa demanda de forma permanente do sistema?')">
+                                    <i class="bi bi-trash3-fill"></i>
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -397,15 +405,21 @@ def index():
     filtro_status = request.args.get('status', 'Pendente')
     filtro_area = request.args.get('area', 'Todas')
     
-    query = Demanda.query.filter(Demanda.status == filtro_status)
-    if filtro_area != 'Todas': query = query.filter(Demanda.area == filtro_area)
+    # AJUSTE ADICIONADO: Se for 'Todos', pula o filtro de status da query
+    if filtro_status == 'Todos':
+        query = Demanda.query
+    else:
+        query = Demanda.query.filter(Demanda.status == filtro_status)
+        
+    if filtro_area != 'Todas': 
+        query = query.filter(Demanda.area == filtro_area)
+        
     demandas_filtradas = query.all()
-    
     demandas_filtradas.sort(key=lambda x: (x.prio_num, x.data_sort))
     
     ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
     
-    # Relatório WhatsApp
+    # Relatório unificado WhatsApp permanece inalterado varrendo o que estiver ativo
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (x.prio_num, x.data_sort))
     
@@ -418,15 +432,10 @@ def index():
         concluidos = sum(1 for chk in d.checklists if chk.concluido)
         perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
         
-        # SINALIZAÇÃO DE 4 CORES ATUALIZADA PRO ZAP
-        if d.prio_num <= 3:
-            bloco_ico = "🔴"
-        elif d.prio_num <= 6:
-            bloco_ico = "🟡"
-        elif d.prio_num <= 10:
-            bloco_ico = "🟢"
-        else:
-            bloco_ico = "🔵"
+        if d.prio_num <= 3: bloco_ico = "🔴"
+        elif d.prio_num <= 6: bloco_ico = "🟡"
+        elif d.prio_num <= 10: bloco_ico = "🟢"
+        else: bloco_ico = "🔵"
         
         texto_whats += f"{bloco_ico} *Posição [{d.prio_num}]* - {d.titulo}\n"
         texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
@@ -465,14 +474,15 @@ def nova_demanda():
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
+    origem_status = request.args.get('status', 'Pendente')
+    origem_area = request.args.get('area', 'Todas')
     
     demanda.area = request.form.get('area', demanda.area)
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
     nova_prio = request.form.get('prioridade')
-    if nova_prio:
-        demanda.prioridade = str(nova_prio)
+    if nova_prio: demanda.prioridade = str(nova_prio)
     
     if request.form.get('data_inicio'): demanda.data_inicio = datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date()
     if request.form.get('data_prorrogacao'): demanda.data_prorrogacao = datetime.strptime(request.form['data_prorrogacao'], '%Y-%m-%d').date()
@@ -486,7 +496,20 @@ def atualizar(id):
         if np.strip(): db.session.add(Checklist(demanda_id=demanda.id, passo=np.strip()))
         
     db.session.commit()
-    return redirect(url_for('index', status=request.args.get('status'), area=request.args.get('area')))
+    return redirect(url_for('index', status=origem_status, area=origem_area))
+
+# ==========================================
+# ROTA ADICIONADA: EXCLUIR DEMANDA DO BANCO
+# ==========================================
+@app.route('/deletar/<int:id>', methods=['POST'])
+def deletar(id):
+    demanda = Demanda.query.get_or_404(id)
+    origem_status = request.args.get('status', 'Pendente')
+    origem_area = request.args.get('area', 'Todas')
+    
+    db.session.delete(demanda)
+    db.session.commit()
+    return redirect(url_for('index', status=origem_status, area=origem_area))
 
 @app.route('/atas')
 def lista_atas():
