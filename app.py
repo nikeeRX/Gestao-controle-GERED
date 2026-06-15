@@ -29,7 +29,7 @@ class Demanda(db.Model):
     titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título')
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
-    prioridade = db.Column(db.String(20), nullable=False)
+    prioridade = db.Column(db.Integer, nullable=False, default=50) # ALTERADO PARA INTEIRO (1 a 50)
     status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
@@ -54,8 +54,20 @@ class AtaReuniao(db.Model):
 
 with app.app_context():
     db.create_all()
-    # Garante que a coluna de prorrogação exista sem apagar nada
+    # Migração segura para converter a coluna de texto para número no Postgres do Railway
     try:
+        db.session.execute(db.text("""
+            ALTER TABLE demandas 
+            ALTER COLUMN prioridade TYPE INTEGER 
+            USING (CASE 
+                WHEN prioridade='Extremo' THEN 1 
+                WHEN prioridade='Alto' THEN 10 
+                WHEN prioridade='Médio' THEN 20 
+                WHEN prioridade='Mínimo' THEN 30 
+                WHEN prioridade ~ '^[0-9]+$' THEN prioridade::integer 
+                ELSE 50 
+            END);
+        """))
         db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS data_prorrogacao DATE;"))
         db.session.commit()
     except Exception as e:
@@ -147,6 +159,8 @@ TELA_PRINCIPAL = """
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
+                            <span class="badge bg-danger">⭐ Posição {{ demanda.prioridade }}</span>
+                            
                             <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
                         </div>
                         <div class="text-end" style="min-width: 110px;">
@@ -179,12 +193,25 @@ TELA_PRINCIPAL = """
                                         <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
                                     </select>
                                 </div>
+                                
+                                <div class="col-12">
+                                    <label class="small fw-bold text-primary">Alterar Posição de Prioridade (1-50)</label>
+                                    <select name="prioridade" class="form-select form-select-sm border-primary">
+                                        {% for n in range(1, 51) %}
+                                            {% if n == demanda.prioridade %}
+                                                <option value="{{ n }}" selected>⭐ Posição {{ n }} (Atual deste chamado)</option>
+                                            {% elif n not in ocupados_global %}
+                                                <option value="{{ n }}">🔢 Posição {{ n }}</option>
+                                            {% endfor %}
+                                    </select>
+                                </div>
+                                
                                 <div class="col-6">
                                     <label class="small fw-bold">Data Início</label>
                                     <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ demanda.data_inicio.strftime('%Y-%m-%d') if demanda.data_inicio else '' }}">
                                 </div>
                                 <div class="col-6">
-                                    <label class="small fw-bold text-warning text-dark">Prorrogação</label>
+                                    <label class="small fw-bold text-dark">Prorrogação</label>
                                     <input type="date" name="data_prorrogacao" class="form-control form-control-sm border-warning" value="{{ demanda.data_prorrogacao.strftime('%Y-%m-%d') if demanda.data_prorrogacao else '' }}">
                                 </div>
                             </div>
@@ -245,7 +272,7 @@ TELA_NOVA_DEMANDA = """
     <div class="container-app mt-3">
         <form method="POST">
             <div class="mb-3">
-                <label class="fw-bold small">Título</label>
+                <label class="fw-bold small">Título da Demanda</label>
                 <input type="text" name="titulo" class="form-control" placeholder="Título resumido..." required>
             </div>
             <div class="row g-2 mb-3">
@@ -257,13 +284,15 @@ TELA_NOVA_DEMANDA = """
                         {% endfor %}
                     </select>
                 </div>
+                
                 <div class="col-6">
-                    <label class="fw-bold small">Prioridade</label>
-                    <select name="prioridade" class="form-select" required>
-                        <option value="Mínimo">🟢 Mínimo</option>
-                        <option value="Médio" selected>🔵 Médio</option>
-                        <option value="Alto">🟡 Alto</option>
-                        <option value="Extremo">🔴 Extremo</option>
+                    <label class="fw-bold small text-primary">Posição de Prioridade</label>
+                    <select name="prioridade" class="form-select border-primary" required>
+                        {% for n in range(1, 51) %}
+                            {% if n not in ocupados %}
+                                <option value="{{ n }}">🔢 Posição {{ n }}</option>
+                            {% endif %}
+                        {% endfor %}
                     </select>
                 </div>
             </div>
@@ -272,8 +301,8 @@ TELA_NOVA_DEMANDA = """
                 <textarea name="descricao" class="form-control" rows="3" required></textarea>
             </div>
             <div class="row g-2 mb-4">
-                <div class="col-6"><label class="fw-bold small">Início</label><input type="date" name="data_inicio" class="form-control"></div>
-                <div class="col-6"><label class="fw-bold small text-danger">Previsão</label><input type="date" name="data_prevista" class="form-control border-danger" required></div>
+                <div class="col-6"><label class="fw-bold small">Data Início</label><input type="date" name="data_inicio" class="form-control"></div>
+                <div class="col-6"><label class="fw-bold small text-danger">Previsão Fim</label><input type="date" name="data_prevista" class="form-control border-danger" required></div>
             </div>
             <div class="card-app p-3 mb-4 border">
                 <div class="d-flex justify-content-between mb-3"><h6 class="fw-bold m-0">Checklist</h6><button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarPasso()">+ Item</button></div>
@@ -356,62 +385,85 @@ TELA_NOVA_ATA = """
 def index():
     filtro_status = request.args.get('status', 'Pendente')
     filtro_area = request.args.get('area', 'Todas')
+    
     query = Demanda.query.filter(Demanda.status == filtro_status)
     if filtro_area != 'Todas': query = query.filter(Demanda.area == filtro_area)
     demandas_filtradas = query.all()
-    peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
-    demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prorrogacao or x.data_prevista))
     
+    # ORDENAÇÃO MATADORA: Posição 1 vai pro topo, posição 50 vai pro fundo
+    demandas_filtradas.sort(key=lambda x: (x.prioridade, x.data_prorrogacao or x.data_prevista))
+    
+    # Varre quais números de 1 a 50 estão ocupados globalmente por chamados ATIVOS (Pendente/Iniciado)
+    ocupados = [d.prioridade for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
+    
+    # Lógica do relatório unificado do WhatsApp (Todas as ativas do 1 ao 50)
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
-    demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prorrogacao or x.data_prevista))
+    demandas_em_aberto.sort(key=lambda x: (x.prioridade, x.data_prorrogacao or x.data_prevista))
     
-    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS*\n=============================\n\n"
-    icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
+    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS (ORDEM DE PRIORIDADE)*\n"
+    texto_whats += "=========================================\n\n"
     
-    criticas = [d for d in demandas_em_aberto if d.prioridade in ['Extremo', 'Alto']]
-    demais = [d for d in demandas_em_aberto if d.prioridade in ['Médio', 'Mínimo']]
-    
-    for titulo_sec, lista in [("🔥 *URGENTES*", criticas), ("🗓️ *DEMAIS PENDÊNCIAS*", demais)]:
-        if lista:
-            texto_whats += f"{titulo_sec}\n-----------------------------\n"
-            for d in lista:
-                ico = icones.get(d.prioridade, '🔹')
-                venc = (d.data_prorrogacao or d.data_prevista).strftime('%d/%m/%Y')
-                total_chk = len(d.checklists)
-                concluidos = sum(1 for chk in d.checklists if chk.concluido)
-                perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
-                texto_whats += f"{ico} *{d.titulo}*\n└ *Área:* {d.area} | *Venc:* {venc}\n└ *Status:* {d.status} ({perc}%)\n\n"
+    for d in demandas_em_aberto:
+        venc = (d.data_prorrogacao or d.data_prevista).strftime('%d/%m/%Y')
+        total_chk = len(d.checklists)
+        concluidos = sum(1 for chk in d.checklists if chk.concluido)
+        perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
+        
+        texto_whats += f"⭐ *Posição [{d.prioridade}]* - {d.titulo}\n"
+        texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
+        texto_whats += f"└ *Status:* {d.status} ({perc}%)\n"
+        texto_whats += "-----------------------------------------\n"
+        
+    if not demandas_em_aberto:
+        texto_whats += "✅ Nenhuma demanda ativa no momento!\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/5561995414168?text={texto_codificado}"
-    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area)
+    
+    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area, ocupados_global=ocupados)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
     if request.method == 'POST':
-        nova_dem = Demanda(titulo=request.form.get('titulo'), area=request.form['area'], descricao=request.form['descricao'], prioridade=request.form['prioridade'], data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date())
+        nova_dem = Demanda(
+            titulo=request.form.get('titulo'), 
+            area=request.form['area'], 
+            descricao=request.form['descricao'], 
+            prioridade=int(request.form['prioridade']), # Salva o número escolhido
+            data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, 
+            data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
+        )
         db.session.add(nova_dem)
         db.session.flush() 
         for passo in request.form.getlist('passo_checklist[]'):
             if passo.strip(): db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
         return redirect(url_for('index'))
-    return render_template_string(TELA_NOVA_DEMANDA)
+        
+    # Pega números ocupados para travar a tela de cadastro inicial
+    ocupados = [d.prioridade for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
+    return render_template_string(TELA_NOVA_DEMANDA, ocupados=ocupados)
 
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
+    
     demanda.area = request.form.get('area', demanda.area)
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
+    demanda.prioridade = int(request.form.get('prioridade', demanda.prioridade)) # Atualiza a prioridade
+    
     if request.form.get('data_inicio'): demanda.data_inicio = datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date()
     if request.form.get('data_prorrogacao'): demanda.data_prorrogacao = datetime.strptime(request.form['data_prorrogacao'], '%Y-%m-%d').date()
+    
     demanda.data_conclusao = datetime.utcnow().date() if demanda.status == 'Finalizado' else None
+    
     for chk in demanda.checklists:
         chk.concluido = f'chk_status_{chk.id}' in request.form
         if request.form.get(f'chk_texto_{chk.id}'): chk.passo = request.form.get(f'chk_texto_{chk.id}')
     for np in request.form.getlist('novo_passo[]'):
         if np.strip(): db.session.add(Checklist(demanda_id=demanda.id, passo=np.strip()))
+        
     db.session.commit()
     return redirect(url_for('index', status=request.args.get('status'), area=request.args.get('area')))
 
@@ -440,7 +492,6 @@ def gerar_pdf_ata(id):
         pdf.add_page()
         def limpa_texto(texto): return str(texto).encode('latin-1', 'replace').decode('latin-1')
         pdf.set_font("helvetica", style="B", size=16)
-        # CORREÇÃO CRUCIAL: Título agora passa pelo textwrap.wrap
         titulo_comp = limpa_texto(f"Ata de Reuniao: {ata.assunto}")
         lin_t = textwrap.wrap(titulo_comp, width=45, break_long_words=True)
         for lt in lin_t: pdf.multi_cell(0, 10, lt, align="C", new_x="LMARGIN", new_y="NEXT")
@@ -456,7 +507,6 @@ def gerar_pdf_ata(id):
             linha_limpa = linha.strip()
             if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
-                # CORREÇÃO AQUI TAMBÉM: Use linha_limpa ao invés do erro de digitação
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
                 for pedaco in linhas_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
                 contador += 1
