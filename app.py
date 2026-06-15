@@ -54,6 +54,7 @@ class AtaReuniao(db.Model):
 
 with app.app_context():
     db.create_all()
+    # Garante que a coluna de prorrogação exista sem apagar nada
     try:
         db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS data_prorrogacao DATE;"))
         db.session.commit()
@@ -102,7 +103,7 @@ MENU_INFERIOR = """
 """
 
 # ==========================================
-# 4. TEMPLATES HTML COMPATÍVEIS
+# 4. TEMPLATES HTML
 # ==========================================
 TELA_PRINCIPAL = """
 <!DOCTYPE html>
@@ -118,19 +119,16 @@ TELA_PRINCIPAL = """
     <div class="container-app mt-3">
         <div class="d-flex justify-content-center mb-2">
             <div class="btn-group w-100 shadow-sm" style="border-radius: 12px; overflow: hidden; border: 1px solid #e5e5ea;">
-                <a href="/?status=Pendente&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">⏳ Pendentes</a>
-                <a href="/?status=Iniciado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">🚀 Iniciados</a>
-                <a href="/?status=Finalizado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2" style="font-size: 0.85rem;">✅ Finalizados</a>
+                <a href="/?status=Pendente&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Pendente' %}btn-secondary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">⏳ Pendentes</a>
+                <a href="/?status=Iniciado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Iniciado' %}btn-primary text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">🚀 Iniciados</a>
+                <a href="/?status=Finalizado&area={{ filtro_area }}" class="btn btn-sm {% if filtro_status == 'Finalizado' %}btn-success text-white{% else %}btn-light text-muted{% endif %} fw-bold py-2">✅ Finalizados</a>
             </div>
         </div>
         
         <div class="d-flex overflow-auto mb-3 pb-1 scroll-menu" style="gap: 8px; white-space: nowrap;">
-            <a href="/?status={{ filtro_status }}&area=Todas" class="btn btn-sm {% if filtro_area == 'Todas' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">Todas</a>
-            <a href="/?status={{ filtro_status }}&area=CODER" class="btn btn-sm {% if filtro_area == 'CODER' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">CODER</a>
-            <a href="/?status={{ filtro_status }}&area=COCAP" class="btn btn-sm {% if filtro_area == 'COCAP' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">COCAP</a>
-            <a href="/?status={{ filtro_status }}&area=CONEC" class="btn btn-sm {% if filtro_area == 'CONEC' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">CONEC</a>
-            <a href="/?status={{ filtro_status }}&area=GERED" class="btn btn-sm {% if filtro_area == 'GERED' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">GERED</a>
-            <a href="/?status={{ filtro_status }}&area=EXTERNO" class="btn btn-sm {% if filtro_area == 'EXTERNO' %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold" style="font-size: 0.8rem;">EXTERNO</a>
+            {% for a in ['Todas', 'CODER', 'COCAP', 'CONEC', 'GERED', 'EXTERNO'] %}
+            <a href="/?status={{ filtro_status }}&area={{ a }}" class="btn btn-sm {% if filtro_area == a %}btn-dark{% else %}btn-outline-secondary bg-white{% endif %} rounded-pill px-3 fw-bold">{{ a }}</a>
+            {% endfor %}
         </div>
         
         <a href="{{ link_whatsapp }}" target="_blank" class="btn btn-success btn-app w-100 mb-4 shadow-sm" style="border-radius: 16px;">
@@ -139,12 +137,9 @@ TELA_PRINCIPAL = """
         
         <div class="accordion" id="accordionDemandas">
             {% for demanda in demandas %}
-            
             {% set total_chk = demanda.checklists|length %}
             {% set ns = namespace(concluidos=0) %}
-            {% for chk in demanda.checklists %}
-                {% if chk.concluido %}{% set ns.concluidos = ns.concluidos + 1 %}{% endif %}
-            {% endfor %}
+            {% for chk in demanda.checklists %}{% if chk.concluido %}{% set ns.concluidos = ns.concluidos + 1 %}{% endif %}{% endfor %}
             {% set percentual = (ns.concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
 
             <div class="card-app">
@@ -152,25 +147,14 @@ TELA_PRINCIPAL = """
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
-                            {% if demanda.prioridade == 'Extremo' %}<span class="badge bg-danger">🔴 Extremo</span>
-                            {% elif demanda.prioridade == 'Alto' %}<span class="badge bg-warning text-dark">🟡 Alto</span>
-                            {% elif demanda.prioridade == 'Médio' %}<span class="badge bg-info text-dark">🔵 Médio</span>
-                            {% else %}<span class="badge bg-secondary">🟢 Mínimo</span>{% endif %}
-                            
-                            <h6 class="mt-2 mb-1 fw-bold text-dark" style="line-height: 1.3;">{{ demanda.titulo }}</h6>
+                            <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
                         </div>
-                        
                         <div class="text-end" style="min-width: 110px;">
                             <div class="d-flex justify-content-end align-items-center mb-1">
                                 <span class="badge bg-light text-dark border me-1">{{ percentual }}%</span>
-                                {% if demanda.status == 'Finalizado' %}<span class="badge bg-success">Finalizado</span>
-                                {% elif demanda.status == 'Iniciado' %}<span class="badge bg-primary">Iniciado</span>
-                                {% else %}<span class="badge bg-secondary">Pendente</span>{% endif %}
+                                <span class="badge {% if demanda.status == 'Finalizado' %}bg-success{% elif demanda.status == 'Iniciado' %}bg-primary{% else %}bg-secondary{% endif %}">{{ demanda.status }}</span>
                             </div>
-                            <small class="text-danger fw-bold d-block" style="font-size: 0.7rem;">📅 P: {{ demanda.data_prevista.strftime('%d/%m/%Y') }}</small>
-                            {% if demanda.data_prorrogacao %}
-                                <small class="text-warning text-dark fw-bold d-block" style="font-size: 0.7rem;">⏳ PR: {{ demanda.data_prorrogacao.strftime('%d/%m/%Y') }}</small>
-                            {% endif %}
+                            <small class="text-danger fw-bold d-block">📅 {{ (demanda.data_prorrogacao or demanda.data_prevista).strftime('%d/%m/%Y') }}</small>
                         </div>
                     </div>
                 </div>
@@ -178,61 +162,46 @@ TELA_PRINCIPAL = """
                 <div id="collapse{{ demanda.id }}" class="collapse" data-bs-parent="#accordionDemandas">
                     <div class="card-body p-3 border-top">
                         <form action="/atualizar/{{ demanda.id }}?status={{ filtro_status }}&area={{ filtro_area }}" method="POST">
-                            
-                            <div class="row mb-2">
-                                <div class="col-6 mb-2">
-                                    <label class="form-label fw-bold text-secondary small mb-1">Área / Setor Responsável</label>
-                                    <select name="area" class="form-select form-select-sm border-primary shadow-sm">
-                                        <option value="CODER" {% if demanda.area == 'CODER' %}selected{% endif %}>CODER</option>
-                                        <option value="COCAP" {% if demanda.area == 'COCAP' %}selected{% endif %}>COCAP</option>
-                                        <option value="CONEC" {% if demanda.area == 'CONEC' %}selected{% endif %}>CONEC</option>
-                                        <option value="GERED" {% if demanda.area == 'GERED' %}selected{% endif %}>GERED</option>
-                                        <option value="EXTERNO" {% if demanda.area == 'EXTERNO' %}selected{% endif %}>EXTERNO</option>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="small fw-bold">Área Responsável</label>
+                                    <select name="area" class="form-select form-select-sm">
+                                        {% for a in ['CODER', 'COCAP', 'CONEC', 'GERED', 'EXTERNO'] %}
+                                        <option value="{{ a }}" {% if demanda.area == a %}selected{% endif %}>{{ a }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-6 mb-2">
-                                    <label class="form-label fw-bold text-secondary small mb-1">Status da Demanda</label>
-                                    <select name="status" class="form-select form-select-sm border-primary shadow-sm">
+                                <div class="col-6">
+                                    <label class="small fw-bold">Status</label>
+                                    <select name="status" class="form-select form-select-sm">
                                         <option value="Pendente" {% if demanda.status == 'Pendente' %}selected{% endif %}>⏳ Pendente</option>
                                         <option value="Iniciado" {% if demanda.status == 'Iniciado' %}selected{% endif %}>🚀 Iniciado</option>
                                         <option value="Finalizado" {% if demanda.status == 'Finalizado' %}selected{% endif %}>✅ Finalizado</option>
                                     </select>
                                 </div>
-                                <div class="col-6 mb-2">
-                                    <label class="form-label fw-bold text-secondary small mb-1">Data Início</label>
+                                <div class="col-6">
+                                    <label class="small fw-bold">Data Início</label>
                                     <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ demanda.data_inicio.strftime('%Y-%m-%d') if demanda.data_inicio else '' }}">
                                 </div>
-                                <div class="col-6 mb-2">
-                                    <label class="form-label fw-bold text-warning text-dark small mb-1">Prorrogação</label>
+                                <div class="col-6">
+                                    <label class="small fw-bold text-warning text-dark">Prorrogação</label>
                                     <input type="date" name="data_prorrogacao" class="form-control form-control-sm border-warning" value="{{ demanda.data_prorrogacao.strftime('%Y-%m-%d') if demanda.data_prorrogacao else '' }}">
                                 </div>
                             </div>
-                            
                             <div class="mb-3">
-                                <label class="form-label fw-bold text-secondary small mb-1">Observações / Detalhes (Editável)</label>
-                                <textarea name="descricao" class="form-control form-control-sm border" rows="4">{{ demanda.descricao }}</textarea>
+                                <label class="small fw-bold">Observações (Editável)</label>
+                                <textarea name="descricao" class="form-control form-control-sm" rows="4">{{ demanda.descricao }}</textarea>
                             </div>
-                            
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="fw-bold text-secondary m-0 small">Progresso Checklist</h6>
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" style="font-size:0.75rem;" onclick="addChkEdit({{ demanda.id }})">+ Item</button>
+                                <h6 class="fw-bold m-0 small">Checklist</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2" onclick="addChkEdit({{ demanda.id }})">+ Item</button>
                             </div>
-                            
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="progress flex-grow-1 me-2 rounded-pill" style="height: 10px;">
-                                    <div class="progress-bar {% if percentual == 100 %}bg-success{% else %}bg-primary{% endif %} rounded-pill" style="width: {{ percentual }}%;"></div>
-                                </div>
-                                <small class="fw-bold text-muted" style="font-size: 0.8rem;">{{ percentual }}%</small>
-                            </div>
-
                             <div class="mb-4">
                                 {% for chk in demanda.checklists %}
                                 <div class="d-flex align-items-center mb-2">
-                                    <input class="form-check-input mt-0 me-2 border-secondary" type="checkbox" name="chk_status_{{ chk.id }}" value="1" {% if chk.concluido %}checked{% endif %} style="transform: scale(1.15);">
-                                    <input type="text" name="chk_texto_{{ chk.id }}" class="form-control form-control-sm {% if chk.concluido %}text-decoration-line-through text-success fw-bold{% else %}text-dark{% endif %}" value="{{ chk.passo }}" style="border: 1px dashed transparent; background: transparent; transition: 0.3s;" onfocus="this.style.border='1px dashed #ccc'; this.style.background='#fff';" onblur="this.style.border='1px dashed transparent'; this.style.background='transparent';">
+                                    <input class="form-check-input mt-0 me-2" type="checkbox" name="chk_status_{{ chk.id }}" value="1" {% if chk.concluido %}checked{% endif %}>
+                                    <input type="text" name="chk_texto_{{ chk.id }}" class="form-control form-control-sm" value="{{ chk.passo }}" style="border: none; background: transparent;">
                                 </div>
-                                {% else %}
-                                <p class="text-muted small">Nenhuma subetapa cadastrada.</p>
                                 {% endfor %}
                                 <div id="new-chk-container-{{ demanda.id }}"></div>
                             </div>
@@ -241,25 +210,18 @@ TELA_PRINCIPAL = """
                     </div>
                 </div>
             </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-inbox fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma demanda neste filtro! 🎉</p>
-            </div>
             {% endfor %}
         </div>
     </div>
-    
     <a href="/nova_demanda" class="fab"><i class="bi bi-plus-lg"></i></a>
     """ + MENU_INFERIOR + """
-    
     <script>
         function addChkEdit(id) {
             const container = document.getElementById('new-chk-container-' + id);
             const div = document.createElement('div');
             div.className = 'd-flex align-items-center mb-2';
-            div.innerHTML = `<span class="me-2 text-primary" style="width: 16px;"><i class="bi bi-dot"></i></span>
-                             <input type="text" name="novo_passo[]" class="form-control form-control-sm border-primary" placeholder="Novo item da etapa...">`;
+            div.innerHTML = `<span class="me-2 text-primary"><i class="bi bi-dot"></i></span>
+                             <input type="text" name="novo_passo[]" class="form-control form-control-sm border-primary" placeholder="Nova etapa...">`;
             container.appendChild(div);
         }
     </script>
@@ -277,30 +239,26 @@ TELA_NOVA_DEMANDA = """
 </head>
 <body>
     <div class="app-header">
-        <a href="/" class="position-absolute start-0 ms-3 text-dark fs-3" style="line-height:1;"><i class="bi bi-arrow-left-short"></i></a>
+        <a href="/" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>
         Nova Demanda
     </div>
-    
     <div class="container-app mt-3">
         <form method="POST">
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Título da Demanda</label>
-                <input type="text" name="titulo" class="form-control" placeholder="Ex: Criação de Dashboard ANS..." required>
+                <label class="fw-bold small">Título</label>
+                <input type="text" name="titulo" class="form-control" placeholder="Título resumido..." required>
             </div>
-            
-            <div class="row mb-3">
+            <div class="row g-2 mb-3">
                 <div class="col-6">
-                    <label class="form-label fw-bold text-secondary small">Área Responsável</label>
+                    <label class="fw-bold small">Área</label>
                     <select name="area" class="form-select" required>
-                        <option value="CODER">CODER</option>
-                        <option value="COCAP">COCAP</option>
-                        <option value="CONEC">CONEC</option>
-                        <option value="GERED">GERED</option>
-                        <option value="EXTERNO">EXTERNO</option>
+                        {% for a in ['CODER', 'COCAP', 'CONEC', 'GERED', 'EXTERNO'] %}
+                        <option value="{{ a }}">{{ a }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="col-6">
-                    <label class="form-label fw-bold text-secondary small">Prioridade</label>
+                    <label class="fw-bold small">Prioridade</label>
                     <select name="prioridade" class="form-select" required>
                         <option value="Mínimo">🟢 Mínimo</option>
                         <option value="Médio" selected>🔵 Médio</option>
@@ -309,33 +267,18 @@ TELA_NOVA_DEMANDA = """
                     </select>
                 </div>
             </div>
-            
             <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Observações / Escopo Detalhado</label>
-                <textarea name="descricao" class="form-control" rows="3" placeholder="Insira os detalhes técnicos, links ou resumos..." required></textarea>
+                <label class="fw-bold small">Observações iniciais</label>
+                <textarea name="descricao" class="form-control" rows="3" required></textarea>
             </div>
-            
-            <div class="row mb-4">
-                <div class="col-6">
-                    <label class="form-label fw-bold text-secondary small">Data de Início</label>
-                    <input type="date" name="data_inicio" class="form-control">
-                </div>
-                <div class="col-6">
-                    <label class="form-label fw-bold text-danger small">Previsão Fim</label>
-                    <input type="date" name="data_prevista" class="form-control border-danger" required>
-                </div>
+            <div class="row g-2 mb-4">
+                <div class="col-6"><label class="fw-bold small">Início</label><input type="date" name="data_inicio" class="form-control"></div>
+                <div class="col-6"><label class="fw-bold small text-danger">Previsão</label><input type="date" name="data_prevista" class="form-control border-danger" required></div>
             </div>
-            
-            <div class="card-app bg-white p-3 mb-4 border">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0 fw-bold text-secondary">Checklist Auxiliar</h6>
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="adicionarPasso()">+ Item</button>
-                </div>
-                <div id="checklist-container">
-                    <input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Ex: Tratar planilha no Excel...">
-                </div>
+            <div class="card-app p-3 mb-4 border">
+                <div class="d-flex justify-content-between mb-3"><h6 class="fw-bold m-0">Checklist</h6><button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarPasso()">+ Item</button></div>
+                <div id="checklist-container"><input type="text" name="passo_checklist[]" class="form-control mb-2" placeholder="Etapa 1..."></div>
             </div>
-            
             <button type="submit" class="btn btn-primary btn-app w-100 mb-4 shadow-sm">Salvar Registro</button>
         </form>
     </div>
@@ -356,50 +299,30 @@ TELA_ATAS = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPMS System | Atas</title>
+    <title>JPMS | Atas</title>
     """ + ESTILO_APP + """
 </head>
 <body>
     <div class="app-header">📁 Histórico de Atas</div>
-    
     <div class="container-app mt-3">
         <form method="GET" action="/atas" class="mb-4">
             <div class="input-group shadow-sm" style="border-radius: 12px; overflow: hidden;">
-                <input type="text" name="busca" class="form-control border-0" placeholder="🔍 Digite o assunto para pesquisar..." value="{{ busca }}">
+                <input type="text" name="busca" class="form-control border-0" placeholder="🔍 Pesquisar ata..." value="{{ busca }}">
                 <button class="btn btn-primary px-3" type="submit">Buscar</button>
             </div>
-            {% if busca %}
-                <div class="text-end mt-1"><a href="/atas" class="text-decoration-none small text-secondary">❌ Limpar filtro</a></div>
-            {% endif %}
         </form>
-
-        <div class="row">
-            {% for ata in atas %}
-            <div class="col-12">
-                <div class="card-app p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h6 class="fw-bold text-dark text-truncate m-0" style="max-width: 70%;">{{ ata.assunto }}</h6>
-                        <span class="badge bg-light text-dark border font-monospace" style="font-size: 0.75rem;">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</span>
-                    </div>
-                    <p class="text-muted small mb-3" style="display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap;">
-                        {{ ata.topicos }}
-                    </p>
-                    <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold">
-                        <i class="bi bi-file-earmark-pdf-fill"></i> Baixar Arquivo PDF
-                    </a>
-                </div>
+        {% for ata in atas %}
+        <div class="card-app p-3">
+            <div class="d-flex justify-content-between mb-2">
+                <h6 class="fw-bold text-dark text-truncate m-0" style="max-width: 70%;">{{ ata.assunto }}</h6>
+                <span class="badge bg-light text-dark border">{{ ata.data_criacao.strftime('%d/%m/%Y') }}</span>
             </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-journal-x fs-1 text-muted"></i>
-                <p class="text-muted mt-2">Nenhuma ata localizada na busca.</p>
-            </div>
-            {% endfor %}
+            <p class="text-muted small mb-3 text-truncate">{{ ata.topicos }}</p>
+            <a href="/gerar_pdf_ata/{{ ata.id }}" class="btn btn-outline-danger btn-sm w-100 rounded-pill fw-bold"><i class="bi bi-file-earmark-pdf-fill"></i> Baixar PDF</a>
         </div>
+        {% endfor %}
     </div>
-    
-    <a href="/nova_ata" class="fab" style="background: #007aff;"><i class="bi bi-plus-lg"></i></a>
+    <a href="/nova_ata" class="fab"><i class="bi bi-plus-lg"></i></a>
     """ + MENU_INFERIOR + """
 </body>
 </html>
@@ -410,27 +333,16 @@ TELA_NOVA_ATA = """
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Nova Ata de Reunião</title>
+    <title>Gerar Ata</title>
     """ + ESTILO_APP + """
 </head>
 <body>
-    <div class="app-header">
-        <a href="/atas" class="position-absolute start-0 ms-3 text-dark fs-3" style="line-height:1;"><i class="bi bi-arrow-left-short"></i></a>
-        Gerar Nova Ata
-    </div>
-    
+    <div class="app-header"><a href="/atas" class="position-absolute start-0 ms-3 text-dark fs-3"><i class="bi bi-arrow-left-short"></i></a>Gerar Ata</div>
     <div class="container-app mt-3">
         <form method="POST">
-            <div class="mb-3">
-                <label class="form-label fw-bold text-secondary small">Título / Assunto da Pauta</label>
-                <input type="text" name="assunto" class="form-control" placeholder="Ex: Alinhamento de Demandas ANS" required>
-            </div>
-            <div class="mb-4">
-                <label class="form-label fw-bold text-secondary small">Pontos Acordados e Tópicos</label>
-                <div class="form-text text-muted mb-2 small">Aperte 'Enter' para criar cada tópico em linhas separadas.</div>
-                <textarea name="topicos" class="form-control" rows="8" placeholder="Digite as deliberações aqui..." required></textarea>
-            </div>
-            <button type="submit" class="btn btn-info text-white btn-app w-100 mb-4 shadow">💾 Salvar e Criar PDF</button>
+            <div class="mb-3"><label class="fw-bold small">Assunto da Pauta</label><input type="text" name="assunto" class="form-control" required></div>
+            <div class="mb-4"><label class="fw-bold small">Tópicos (Um por linha)</label><textarea name="topicos" class="form-control" rows="10" required></textarea></div>
+            <button type="submit" class="btn btn-info text-white btn-app w-100 shadow">💾 Salvar e Criar PDF</button>
         </form>
     </div>
 </body>
@@ -438,134 +350,77 @@ TELA_NOVA_ATA = """
 """
 
 # ==========================================
-# 5. ROTAS E INTERAÇÕES DO BACKEND
+# 5. ROTAS E LÓGICA DO BACKEND
 # ==========================================
 @app.route('/')
 def index():
     filtro_status = request.args.get('status', 'Pendente')
     filtro_area = request.args.get('area', 'Todas')
-    
     query = Demanda.query.filter(Demanda.status == filtro_status)
-    if filtro_area != 'Todas':
-        query = query.filter(Demanda.area == filtro_area)
-        
+    if filtro_area != 'Todas': query = query.filter(Demanda.area == filtro_area)
     demandas_filtradas = query.all()
     peso_prioridade = {'Extremo': 4, 'Alto': 3, 'Médio': 2, 'Mínimo': 1}
-    demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prevista))
+    demandas_filtradas.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prorrogacao or x.data_prevista))
     
-    # ---------------------------------------------------------
-    # WHATSAPP REESTRUTURADO E SEPARADO POR SEÇÕES VISUAIS
-    # ---------------------------------------------------------
     demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
     demandas_em_aberto.sort(key=lambda x: (-peso_prioridade.get(x.prioridade, 0), x.data_prorrogacao or x.data_prevista))
+    
+    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS*\n=============================\n\n"
+    icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
     
     criticas = [d for d in demandas_em_aberto if d.prioridade in ['Extremo', 'Alto']]
     demais = [d for d in demandas_em_aberto if d.prioridade in ['Médio', 'Mínimo']]
     
-    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS*\n"
-    texto_whats += "=============================\n\n"
-    icones = {'Extremo': '🔴', 'Alto': '🟡', 'Médio': '🔵', 'Mínimo': '🟢'}
-    
-    if criticas:
-        texto_whats += "🔥 *CRÍTICAS / ALTA PRIORIDADE*\n"
-        texto_whats += "-----------------------------\n"
-        for d in criticas:
-            ico = icones.get(d.prioridade, '🔹')
-            venc = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
-            total_chk = len(d.checklists)
-            concluidos = sum(1 for chk in d.checklists if chk.concluido)
-            percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
-            
-            texto_whats += f"{ico} *{d.titulo}*\n"
-            texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
-            texto_whats += f"└ *Status:* {d.status} ({percentual}%)\n\n"
-            
-    if demais:
-        texto_whats += "🗓️ *PENDÊNCIAS E EM ANDAMENTO*\n"
-        texto_whats += "-----------------------------\n"
-        for d in demais:
-            ico = icones.get(d.prioridade, '🔹')
-            venc = d.data_prorrogacao.strftime('%d/%m/%Y') if d.data_prorrogacao else d.data_prevista.strftime('%d/%m/%Y')
-            total_chk = len(d.checklists)
-            concluidos = sum(1 for chk in d.checklists if chk.concluido)
-            percentual = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
-            
-            texto_whats += f"{ico} *{d.titulo}*\n"
-            texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
-            texto_whats += f"└ *Status:* {d.status} ({percentual}%)\n\n"
-        
-    if not demandas_em_aberto:
-        texto_whats += "✅ Nenhuma demanda ativa no momento!\n"
+    for titulo_sec, lista in [("🔥 *URGENTES*", criticas), ("🗓️ *DEMAIS PENDÊNCIAS*", demais)]:
+        if lista:
+            texto_whats += f"{titulo_sec}\n-----------------------------\n"
+            for d in lista:
+                ico = icones.get(d.prioridade, '🔹')
+                venc = (d.data_prorrogacao or d.data_prevista).strftime('%d/%m/%Y')
+                total_chk = len(d.checklists)
+                concluidos = sum(1 for chk in d.checklists if chk.concluido)
+                perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
+                texto_whats += f"{ico} *{d.titulo}*\n└ *Área:* {d.area} | *Venc:* {venc}\n└ *Status:* {d.status} ({perc}%)\n\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
-    numero_destino = "5561995414168"
-    link_whatsapp = f"https://wa.me/{numero_destino}?text={texto_codificado}"
-
+    link_whatsapp = f"https://wa.me/5561995414168?text={texto_codificado}"
     return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area)
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
     if request.method == 'POST':
-        nova_dem = Demanda(
-            titulo=request.form.get('titulo', 'Sem título'),
-            area=request.form['area'], 
-            descricao=request.form['descricao'], 
-            prioridade=request.form['prioridade'], 
-            data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, 
-            data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
-        )
+        nova_dem = Demanda(titulo=request.form.get('titulo'), area=request.form['area'], descricao=request.form['descricao'], prioridade=request.form['prioridade'], data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date())
         db.session.add(nova_dem)
         db.session.flush() 
         for passo in request.form.getlist('passo_checklist[]'):
-            if passo.strip(): 
-                db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
+            if passo.strip(): db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
-        return redirect(url_for('index', status='Pendente'))
+        return redirect(url_for('index'))
     return render_template_string(TELA_NOVA_DEMANDA)
 
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
     demanda = Demanda.query.get_or_404(id)
-    origem_status = request.args.get('status', 'Pendente')
-    origem_area = request.args.get('area', 'Todas')
-    
-    # ATUALIZA MUDANÇA DE SETOR (ÁREA) DO CARD CASO ENVIADA
     demanda.area = request.form.get('area', demanda.area)
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
-    
-    d_inicio = request.form.get('data_inicio')
-    demanda.data_inicio = datetime.strptime(d_inicio, '%Y-%m-%d').date() if d_inicio else None
-    
-    d_prorrog = request.form.get('data_prorrogacao')
-    demanda.data_prorrogacao = datetime.strptime(d_prorrog, '%Y-%m-%d').date() if d_prorrog else None
-    
-    if demanda.status == 'Finalizado':
-        demanda.data_conclusao = datetime.utcnow().date()
-    else:
-        demanda.data_conclusao = None
-    
+    if request.form.get('data_inicio'): demanda.data_inicio = datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date()
+    if request.form.get('data_prorrogacao'): demanda.data_prorrogacao = datetime.strptime(request.form['data_prorrogacao'], '%Y-%m-%d').date()
+    demanda.data_conclusao = datetime.utcnow().date() if demanda.status == 'Finalizado' else None
     for chk in demanda.checklists:
         chk.concluido = f'chk_status_{chk.id}' in request.form
-        novo_texto = request.form.get(f'chk_texto_{chk.id}')
-        if novo_texto:
-            chk.passo = novo_texto
-            
-    novos_passos = request.form.getlist('novo_passo[]')
-    for np in novos_passos:
-        if np.strip():
-            db.session.add(Checklist(demanda_id=demanda.id, passo=np.strip()))
-            
+        if request.form.get(f'chk_texto_{chk.id}'): chk.passo = request.form.get(f'chk_texto_{chk.id}')
+    for np in request.form.getlist('novo_passo[]'):
+        if np.strip(): db.session.add(Checklist(demanda_id=demanda.id, passo=np.strip()))
     db.session.commit()
-    return redirect(url_for('index', status=origem_status, area=origem_area))
+    return redirect(url_for('index', status=request.args.get('status'), area=request.args.get('area')))
 
 @app.route('/atas')
 def lista_atas():
     busca = request.args.get('busca', '')
-    if busca:
-        atas = AtaReuniao.query.filter((AtaReuniao.assunto.ilike(f'%{busca}%')) | (AtaReuniao.topicos.ilike(f'%{busca}%'))).order_by(AtaReuniao.data_criacao.desc()).all()
-    else:
-        atas = AtaReuniao.query.order_by(AtaReuniao.data_criacao.desc()).all()
+    query = AtaReuniao.query
+    if busca: query = query.filter((AtaReuniao.assunto.ilike(f'%{busca}%')) | (AtaReuniao.topicos.ilike(f'%{busca}%')))
+    atas = query.order_by(AtaReuniao.data_criacao.desc()).all()
     return render_template_string(TELA_ATAS, atas=atas, busca=busca, page='atas')
 
 @app.route('/nova_ata', methods=['GET', 'POST'])
@@ -583,45 +438,31 @@ def gerar_pdf_ata(id):
     try:
         pdf = FPDF()
         pdf.add_page()
-        
-        def limpa_texto(texto):
-            return str(texto).encode('latin-1', 'replace').decode('latin-1')
-        
+        def limpa_texto(texto): return str(texto).encode('latin-1', 'replace').decode('latin-1')
         pdf.set_font("helvetica", style="B", size=16)
-        titulo_completo = limpa_texto(f"Ata de Reunião: {ata.assunto}")
-        linhas_titulo = textwrap.wrap(titulo_completo, width=45, break_long_words=True)
-        for linha_t in linhas_titulo:
-            pdf.multi_cell(0, 10, linha_t, align="C", new_x="LMARGIN", new_y="NEXT")
-        
+        # CORREÇÃO CRUCIAL: Título agora passa pelo textwrap.wrap
+        titulo_comp = limpa_texto(f"Ata de Reuniao: {ata.assunto}")
+        lin_t = textwrap.wrap(titulo_comp, width=45, break_long_words=True)
+        for lt in lin_t: pdf.multi_cell(0, 10, lt, align="C", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("helvetica", style="I", size=10)
         pdf.cell(0, 10, limpa_texto(f"Data: {ata.data_criacao.strftime('%d/%m/%Y')}"), new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(10)
-        
         pdf.set_font("helvetica", style="B", size=12)
         pdf.cell(0, 10, "Topicos Discutidos:", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(5)
-        
         pdf.set_font("helvetica", size=11)
         contador = 1
         for linha in ata.topicos.split('\n'):
             linha_limpa = linha.strip()
-            if línea_limpa:
+            if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
+                # CORREÇÃO AQUI TAMBÉM: Use linha_limpa ao invés do erro de digitação
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
-                for pedaco in linhas_quebradas:
-                    pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
+                for pedaco in linhas_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
                 contador += 1
-                
         pdf_bytes = bytes(pdf.output())
-        
-        return send_file(
-            io.BytesIO(pdf_bytes), 
-            as_attachment=True, 
-            download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", 
-            mimetype='application/pdf'
-        )
-    except Exception as e:
-        return f"<h3>Erro interno ao renderizar PDF:</h3><p>{str(e)}</p>", 500
+        return send_file(io.BytesIO(pdf_bytes), as_attachment=True, download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", mimetype='application/pdf')
+    except Exception as e: return f"<h3>Erro interno ao renderizar PDF:</h3><p>{str(e)}</p>", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
