@@ -36,16 +36,18 @@ class Demanda(db.Model):
     data_prevista = db.Column(db.Date, nullable=False)
     data_prorrogacao = db.Column(db.Date, nullable=True) 
     data_conclusao = db.Column(db.Date, nullable=True)
+    
+    # NOVAS COLUNAS DA MATRIZ GUT
+    gravidade = db.Column(db.Integer, default=0)
+    urgencia = db.Column(db.Integer, default=0)
+    tendencia = db.Column(db.Integer, default=0)
+    
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
+    # CÁLCULO OFICIAL DA MATRIZ GUT (Multiplicação)
     @property
-    def prio_num(self):
-        try:
-            val = int(self.prioridade)
-            return val if val <= 15 else 15
-        except (ValueError, TypeError):
-            mapa = {'Extremo': 1, 'Alto': 4, 'Médio': 7, 'Mínimo': 11}
-            return mapa.get(str(self.prioridade), 15)
+    def gut_score(self):
+        return (self.gravidade or 0) * (self.urgencia or 0) * (self.tendencia or 0)
             
     @property
     def data_sort(self):
@@ -68,8 +70,12 @@ class AtaReuniao(db.Model):
 
 with app.app_context():
     db.create_all()
+    # Injeção segura das novas colunas GUT sem apagar o banco
     try:
         db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS data_prorrogacao DATE;"))
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS gravidade INTEGER DEFAULT 0;"))
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS urgencia INTEGER DEFAULT 0;"))
+        db.session.execute(db.text("ALTER TABLE demandas ADD COLUMN IF NOT EXISTS tendencia INTEGER DEFAULT 0;"))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -107,6 +113,10 @@ MENU_INFERIOR = """
     <a href="/" class="nav-item {% if page == 'demandas' %}active{% endif %}">
         <i class="bi bi-card-checklist nav-icon"></i>
         <span>Demandas</span>
+    </a>
+    <a href="/gut" class="nav-item {% if page == 'gut' %}active{% endif %}">
+        <i class="bi bi-bar-chart-steps nav-icon"></i>
+        <span>Análise GUT</span>
     </a>
     <a href="/atas" class="nav-item {% if page == 'atas' %}active{% endif %}">
         <i class="bi bi-journal-text nav-icon"></i>
@@ -155,6 +165,9 @@ TELA_PRINCIPAL = """
             {% set ns = namespace(concluidos=0) %}
             {% for chk in demanda.checklists %}{% if chk.concluido %}{% set ns.concluidos = ns.concluidos + 1 %}{% endif %}{% endfor %}
             {% set percentual = (ns.concluidos / total_chk * 100)|round|int if total_chk > 0 else 0 %}
+            
+            <!-- PEGA A POSIÇÃO GLOBAL BASEADO NA NOTA GUT -->
+            {% set rank = ranking_global.get(demanda.id, 999) %}
 
             <div class="card-app">
                 <div class="card-app-header" data-bs-toggle="collapse" data-bs-target="#collapse{{ demanda.id }}">
@@ -162,19 +175,19 @@ TELA_PRINCIPAL = """
                         <div class="me-2 pe-2">
                             <span class="badge bg-dark mb-1">{{ demanda.area }}</span>
                             
-                            <!-- EXCLUI NUMERO DE PRIORIDADE SE FOR FINALIZADO -->
                             {% if demanda.status == 'Finalizado' %}
                                 <span class="badge bg-secondary">✅ Arquivado</span>
                             {% else %}
-                                {% if demanda.prio_num <= 3 %}
-                                    <span class="badge bg-danger">🔴 Posição {{ demanda.prio_num }}</span>
-                                {% elif demanda.prio_num >= 4 and demanda.prio_num <= 6 %}
-                                    <span class="badge bg-warning text-dark">🟡 Posição {{ demanda.prio_num }}</span>
-                                {% elif demanda.prio_num >= 7 and demanda.prio_num <= 10 %}
-                                    <span class="badge bg-success">🟢 Posição {{ demanda.prio_num }}</span>
+                                {% if rank <= 3 %}
+                                    <span class="badge bg-danger">🔴 {{ rank }}º Lugar</span>
+                                {% elif rank <= 6 %}
+                                    <span class="badge bg-warning text-dark">🟡 {{ rank }}º Lugar</span>
+                                {% elif rank <= 10 %}
+                                    <span class="badge bg-success">🟢 {{ rank }}º Lugar</span>
                                 {% else %}
-                                    <span class="badge bg-primary">🔵 Posição {{ demanda.prio_num }}</span>
+                                    <span class="badge bg-primary">🔵 {{ rank }}º Lugar</span>
                                 {% endif %}
+                                <span class="badge bg-dark ms-1">GUT: {{ demanda.gut_score }}</span>
                             {% endif %}
                             
                             <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
@@ -212,27 +225,32 @@ TELA_PRINCIPAL = """
                                     </select>
                                 </div>
                                 
-                                <div class="col-12">
-                                    <label class="small fw-bold text-primary">Alterar Posição (1-15)</label>
-                                    <select name="prioridade" class="form-select form-select-sm border-primary">
-                                        {% if demanda.status == 'Finalizado' %}
-                                            <option value="{{ demanda.prioridade }}" selected>✅ Posição Liberada (Escolha para reativar)</option>
-                                        {% endif %}
-                                        {% for n in range(1, 16) %}
-                                            {% if n == demanda.prio_num and demanda.status != 'Finalizado' %}
-                                                <option value="{{ n }}" selected>⭐ Posição {{ n }} (Atual)</option>
-                                            {% elif n not in ocupados_global %}
-                                                <option value="{{ n }}">🔢 Posição {{ n }}</option>
-                                            {% endif %}
-                                        {% endfor %}
+                                <!-- EDIÇÃO DE GUT DIRETO NO CARD -->
+                                <div class="col-12 mt-2"><h6 class="fw-bold small text-primary m-0">Reavaliar Matriz GUT (1 a 5)</h6></div>
+                                <div class="col-4">
+                                    <label class="small text-muted" style="font-size:0.7rem;">Gravidade</label>
+                                    <select name="g" class="form-select form-select-sm border-danger text-center fw-bold" style="color: #dc3545;">
+                                        {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.gravidade == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="small text-muted" style="font-size:0.7rem;">Urgência</label>
+                                    <select name="u" class="form-select form-select-sm border-warning text-center fw-bold" style="color: #ffc107;">
+                                        {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.urgencia == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="small text-muted" style="font-size:0.7rem;">Tendência</label>
+                                    <select name="t" class="form-select form-select-sm border-info text-center fw-bold" style="color: #0dcaf0;">
+                                        {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.tendencia == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
                                     </select>
                                 </div>
                                 
-                                <div class="col-6">
+                                <div class="col-6 mt-3">
                                     <label class="small fw-bold">Data Início</label>
                                     <input type="date" name="data_inicio" class="form-control form-control-sm" value="{{ demanda.data_inicio.strftime('%Y-%m-%d') if demanda.data_inicio else '' }}">
                                 </div>
-                                <div class="col-6">
+                                <div class="col-6 mt-3">
                                     <label class="small fw-bold text-dark">Prorrogação</label>
                                     <input type="date" name="data_prorrogacao" class="form-control form-control-sm border-warning" value="{{ demanda.data_prorrogacao.strftime('%Y-%m-%d') if demanda.data_prorrogacao else '' }}">
                                 </div>
@@ -257,13 +275,18 @@ TELA_PRINCIPAL = """
                             
                             <div class="d-flex gap-2">
                                 <button type="submit" class="btn btn-primary btn-app flex-grow-1 shadow-sm">💾 Salvar Modificações</button>
-                                <button type="submit" form="form-deletar-{{ demanda.id }}" class="btn btn-outline-danger btn-app shadow-sm px-3" onclick="return confirm('Tem certeza que deseja apagar permanentemente esta demanda?')">
+                                <button type="button" class="btn btn-outline-danger btn-app shadow-sm px-3" onclick="if(confirm('Tem certeza que deseja apagar permanentemente esta demanda?')) document.getElementById('form-deletar-{{ demanda.id }}').submit();">
                                     <i class="bi bi-trash3-fill"></i>
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-2">Nenhuma demanda neste filtro!</p>
             </div>
             {% endfor %}
         </div>
@@ -280,6 +303,69 @@ TELA_PRINCIPAL = """
             container.appendChild(div);
         }
     </script>
+</body>
+</html>
+"""
+
+TELA_GUT = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>JPMS | Matriz GUT</title>
+    """ + ESTILO_APP + """
+</head>
+<body>
+    <div class="app-header">📊 Análise de GUT</div>
+    <div class="container-app mt-3">
+        <div class="alert alert-info small text-center p-2 mb-3 shadow-sm" style="border-radius: 12px; font-size:0.8rem;">
+            A Matriz GUT <strong>multiplica</strong> os valores (G x U x T) para ranquear as demandas matematicamente.<br>
+            <strong>(1 = Mais leve | 5 = Extremamente Crítico)</strong>
+        </div>
+        
+        {% for demanda in demandas %}
+        {% set rank = loop.index %}
+        <div class="card-app p-3 mb-3 border-start border-4 {% if rank <= 3 %}border-danger{% elif rank <= 6 %}border-warning{% elif rank <= 10 %}border-success{% else %}border-primary{% endif %} shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold m-0 text-dark" style="font-size: 0.85rem; line-height: 1.2; max-width:70%;">{{ rank }}º - {{ demanda.titulo }}</h6>
+                <span class="badge bg-dark ms-2" style="font-size:0.75rem;">GUT: {{ demanda.gut_score }}</span>
+            </div>
+            
+            <!-- AUTOSAVE ATIVADO: É SÓ TOCAR NO NÚMERO QUE ELE SALVA E RECALCULA SOZINHO -->
+            <form action="/salvar_gut/{{ demanda.id }}" method="POST">
+                <div class="row g-1">
+                    <div class="col-3">
+                        <label class="small fw-bold text-muted d-block text-center" style="font-size:0.65rem;">Gravidade</label>
+                        <select name="g" class="form-select form-select-sm text-center fw-bold border-danger shadow-sm" style="color: #dc3545;" onchange="this.form.submit()">
+                            {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.gravidade == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="small fw-bold text-muted d-block text-center" style="font-size:0.65rem;">Urgência</label>
+                        <select name="u" class="form-select form-select-sm text-center fw-bold border-warning shadow-sm" style="color: #ffc107;" onchange="this.form.submit()">
+                            {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.urgencia == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <label class="small fw-bold text-muted d-block text-center" style="font-size:0.65rem;">Tendência</label>
+                        <select name="t" class="form-select form-select-sm text-center fw-bold border-info shadow-sm" style="color: #0dcaf0;" onchange="this.form.submit()">
+                            {% for n in range(1, 6) %}<option value="{{ n }}" {% if demanda.tendencia == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold shadow-sm" style="height: 31px;"><i class="bi bi-check-lg"></i></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-check-circle fs-1 text-success"></i>
+            <p class="text-muted mt-2">Nenhuma demanda ativa para analisar!</p>
+        </div>
+        {% endfor %}
+    </div>
+    """ + MENU_INFERIOR + """
 </body>
 </html>
 """
@@ -303,26 +389,38 @@ TELA_NOVA_DEMANDA = """
                 <label class="fw-bold small">Título da Demanda</label>
                 <input type="text" name="titulo" class="form-control" placeholder="Título resumido..." required>
             </div>
+            
+            <div class="mb-3">
+                <label class="fw-bold small">Área</label>
+                <select name="area" class="form-select" required>
+                    {% for a in ['CODER', 'COCAP', 'CONEC', 'GERED', 'EXTERNO'] %}
+                    <option value="{{ a }}">{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
             <div class="row g-2 mb-3">
-                <div class="col-6">
-                    <label class="fw-bold small">Área</label>
-                    <select name="area" class="form-select" required>
-                        {% for a in ['CODER', 'COCAP', 'CONEC', 'GERED', 'EXTERNO'] %}
-                        <option value="{{ a }}">{{ a }}</option>
-                        {% endfor %}
+                <div class="col-12"><label class="fw-bold small text-primary">Análise Inicial (1 a 5)</label></div>
+                <div class="col-4">
+                    <label class="small text-danger fw-bold" style="font-size:0.7rem;">Gravidade</label>
+                    <select name="g" class="form-select border-danger text-center">
+                        {% for n in range(1, 6) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
                     </select>
                 </div>
-                <div class="col-6">
-                    <label class="fw-bold small text-primary">Posição de Prioridade</label>
-                    <select name="prioridade" class="form-select border-primary" required>
-                        {% for n in range(1, 16) %}
-                            {% if n not in ocupados %}
-                                <option value="{{ n }}">🔢 Posição {{ n }}</option>
-                            {% endif %}
-                        {% endfor %}
+                <div class="col-4">
+                    <label class="small text-warning text-dark fw-bold" style="font-size:0.7rem;">Urgência</label>
+                    <select name="u" class="form-select border-warning text-center">
+                        {% for n in range(1, 6) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="col-4">
+                    <label class="small text-info text-dark fw-bold" style="font-size:0.7rem;">Tendência</label>
+                    <select name="t" class="form-select border-info text-center">
+                        {% for n in range(1, 6) %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
                     </select>
                 </div>
             </div>
+            
             <div class="mb-3">
                 <label class="fw-bold small">Observações iniciais</label>
                 <textarea name="descricao" class="form-control" rows="3" required></textarea>
@@ -413,7 +511,6 @@ def index():
     filtro_status = request.args.get('status', 'Todos')
     filtro_area = request.args.get('area', 'Todas')
     
-    # SE FOR "TODOS", ESCONDE O QUE FOR "FINALIZADO" (ARQUIVADO)
     if filtro_status == 'Todos':
         query = Demanda.query.filter(Demanda.status != 'Finalizado')
     else:
@@ -423,39 +520,58 @@ def index():
         query = query.filter(Demanda.area == filtro_area)
         
     demandas_filtradas = query.all()
-    demandas_filtradas.sort(key=lambda x: (x.prio_num, x.data_sort))
+    demandas_filtradas.sort(key=lambda x: (-x.gut_score, x.data_sort))
     
-    ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
+    # Cria um Dicionário de Ranking Global (1º, 2º, 3º lugar) baseado no GUT
+    todas_ativas = Demanda.query.filter(Demanda.status != 'Finalizado').all()
+    todas_ativas.sort(key=lambda x: (-x.gut_score, x.data_sort))
+    ranking_global = {d.id: idx+1 for idx, d in enumerate(todas_ativas)}
     
-    demandas_em_aberto = Demanda.query.filter(Demanda.status != 'Finalizado').all()
-    demandas_em_aberto.sort(key=lambda x: (x.prio_num, x.data_sort))
-    
-    texto_whats = "📋 *RELATÓRIO DE DEMANDAS ATIVAS*\n"
+    texto_whats = "📋 *RELATÓRIO DE DEMANDAS (RANKING GUT)*\n"
     texto_whats += "=========================================\n\n"
     
-    for d in demandas_em_aberto:
+    for idx, d in enumerate(todas_ativas):
+        rank = idx + 1
         venc = (d.data_prorrogacao or d.data_prevista).strftime('%d/%m/%Y') if (d.data_prorrogacao or d.data_prevista) else 'S/D'
         total_chk = len(d.checklists)
         concluidos = sum(1 for chk in d.checklists if chk.concluido)
         perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
         
-        if d.prio_num <= 3: bloco_ico = "🔴"
-        elif d.prio_num <= 6: bloco_ico = "🟡"
-        elif d.prio_num <= 10: bloco_ico = "🟢"
+        if rank <= 3: bloco_ico = "🔴"
+        elif rank <= 6: bloco_ico = "🟡"
+        elif rank <= 10: bloco_ico = "🟢"
         else: bloco_ico = "🔵"
         
-        texto_whats += f"{bloco_ico} *Posição [{d.prio_num}]* - {d.titulo}\n"
+        texto_whats += f"{bloco_ico} *{rank}º Lugar [GUT: {d.gut_score}]* - {d.titulo}\n"
         texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
         texto_whats += f"└ *Status:* {d.status} ({perc}%)\n"
         texto_whats += "-----------------------------------------\n"
         
-    if not demandas_em_aberto:
+    if not todas_ativas:
         texto_whats += "✅ Nenhuma demanda ativa no momento!\n"
         
     texto_codificado = urllib.parse.quote(texto_whats)
     link_whatsapp = f"https://wa.me/5561995414168?text={texto_codificado}"
     
-    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area, ocupados_global=ocupados)
+    return render_template_string(TELA_PRINCIPAL, demandas=demandas_filtradas, link_whatsapp=link_whatsapp, page='demandas', filtro_status=filtro_status, filtro_area=filtro_area, ranking_global=ranking_global)
+
+# NOVA ROTA: ABA DA MATRIZ GUT
+@app.route('/gut')
+def gut():
+    demandas = Demanda.query.filter(Demanda.status != 'Finalizado').all()
+    demandas.sort(key=lambda x: (-x.gut_score, x.data_sort))
+    return render_template_string(TELA_GUT, demandas=demandas, page='gut')
+
+# NOVA ROTA: SALVAMENTO RÁPIDO DO GUT
+@app.route('/salvar_gut/<int:id>', methods=['POST'])
+def salvar_gut(id):
+    demanda = Demanda.query.get_or_404(id)
+    demanda.gravidade = int(request.form.get('g', 1))
+    demanda.urgencia = int(request.form.get('u', 1))
+    demanda.tendencia = int(request.form.get('t', 1))
+    db.session.commit()
+    # Retorna para a mesma página para não atrapalhar o fluxo
+    return redirect(request.referrer or url_for('gut'))
 
 @app.route('/nova_demanda', methods=['GET', 'POST'])
 def nova_demanda():
@@ -464,7 +580,9 @@ def nova_demanda():
             titulo=request.form.get('titulo'), 
             area=request.form['area'], 
             descricao=request.form['descricao'], 
-            prioridade=str(request.form['prioridade']), 
+            gravidade=int(request.form.get('g', 1)),
+            urgencia=int(request.form.get('u', 1)),
+            tendencia=int(request.form.get('t', 1)),
             data_inicio=datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date() if request.form.get('data_inicio') else None, 
             data_prevista=datetime.strptime(request.form['data_prevista'], '%Y-%m-%d').date()
         )
@@ -474,9 +592,7 @@ def nova_demanda():
             if passo.strip(): db.session.add(Checklist(demanda_id=nova_dem.id, passo=passo))
         db.session.commit()
         return redirect(url_for('index', status='Todos'))
-        
-    ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
-    return render_template_string(TELA_NOVA_DEMANDA, ocupados=ocupados)
+    return render_template_string(TELA_NOVA_DEMANDA)
 
 @app.route('/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
@@ -488,8 +604,9 @@ def atualizar(id):
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
-    nova_prio = request.form.get('prioridade')
-    if nova_prio: demanda.prioridade = str(nova_prio)
+    if request.form.get('g'): demanda.gravidade = int(request.form.get('g'))
+    if request.form.get('u'): demanda.urgencia = int(request.form.get('u'))
+    if request.form.get('t'): demanda.tendencia = int(request.form.get('t'))
     
     if request.form.get('data_inicio'): demanda.data_inicio = datetime.strptime(request.form['data_inicio'], '%Y-%m-%d').date()
     if request.form.get('data_prorrogacao'): demanda.data_prorrogacao = datetime.strptime(request.form['data_prorrogacao'], '%Y-%m-%d').date()
