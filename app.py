@@ -29,7 +29,7 @@ class Demanda(db.Model):
     titulo = db.Column(db.String(150), nullable=False, default='Demanda sem título')
     area = db.Column(db.String(50), nullable=False)
     descricao = db.Column(db.Text, nullable=False)
-    prioridade = db.Column(db.String(20), nullable=False, default='50') 
+    prioridade = db.Column(db.String(20), nullable=False, default='15') # Limite padrão ajustado para 15
     status = db.Column(db.String(20), default='Pendente')
     data_solicitacao = db.Column(db.Date, default=datetime.utcnow().date)
     data_inicio = db.Column(db.Date, nullable=True)
@@ -38,14 +38,15 @@ class Demanda(db.Model):
     data_conclusao = db.Column(db.Date, nullable=True)
     checklists = db.relationship('Checklist', backref='demanda', cascade='all, delete-orphan', lazy=True)
 
-    # Converte de forma segura textos antigos em números para ordenação e cores
+    # Converte textos e números antigos com segurança limitando ao topo 15
     @property
     def prio_num(self):
         try:
-            return int(self.prioridade)
+            val = int(self.prioridade)
+            return val if val <= 15 else 15
         except (ValueError, TypeError):
-            mapa = {'Extremo': 1, 'Alto': 5, 'Médio': 15, 'Mínimo': 30}
-            return mapa.get(str(self.prioridade), 50)
+            mapa = {'Extremo': 1, 'Alto': 4, 'Médio': 7, 'Mínimo': 11}
+            return mapa.get(str(self.prioridade), 15)
             
     @property
     def data_sort(self):
@@ -165,8 +166,10 @@ TELA_PRINCIPAL = """
                                 <span class="badge bg-danger">🔴 Posição {{ demanda.prio_num }}</span>
                             {% elif demanda.prio_num >= 4 and demanda.prio_num <= 6 %}
                                 <span class="badge bg-warning text-dark">🟡 Posição {{ demanda.prio_num }}</span>
-                            {% else %}
+                            {% elif demanda.prio_num >= 7 and demanda.prio_num <= 10 %}
                                 <span class="badge bg-success">🟢 Posição {{ demanda.prio_num }}</span>
+                            {% else %}
+                                <span class="badge bg-primary">🔵 Posição {{ demanda.prio_num }}</span>
                             {% endif %}
                             
                             <h6 class="mt-2 mb-1 fw-bold text-dark">{{ demanda.titulo }}</h6>
@@ -203,9 +206,9 @@ TELA_PRINCIPAL = """
                                 </div>
                                 
                                 <div class="col-12">
-                                    <label class="small fw-bold text-primary">Alterar Posição de Prioridade (1-50)</label>
+                                    <label class="small fw-bold text-primary">Alterar Posição de Prioridade (1-15)</label>
                                     <select name="prioridade" class="form-select form-select-sm border-primary">
-                                        {% for n in range(1, 51) %}
+                                        {% for n in range(1, 16) %}
                                             {% if n == demanda.prio_num %}
                                                 <option value="{{ n }}" selected>⭐ Posição {{ n }} (Atual)</option>
                                             {% elif n not in ocupados_global %}
@@ -296,7 +299,7 @@ TELA_NOVA_DEMANDA = """
                 <div class="col-6">
                     <label class="fw-bold small text-primary">Posição de Prioridade</label>
                     <select name="prioridade" class="form-select border-primary" required>
-                        {% for n in range(1, 51) %}
+                        {% for n in range(1, 16) %}
                             {% if n not in ocupados %}
                                 <option value="{{ n }}">🔢 Posição {{ n }}</option>
                             {% endif %}
@@ -400,7 +403,6 @@ def index():
     
     demandas_filtradas.sort(key=lambda x: (x.prio_num, x.data_sort))
     
-    # Numeração Ocupada enviada para o template travar repetição
     ocupados = [d.prio_num for d in Demanda.query.filter(Demanda.status != 'Finalizado').all()]
     
     # Relatório WhatsApp
@@ -416,8 +418,15 @@ def index():
         concluidos = sum(1 for chk in d.checklists if chk.concluido)
         perc = int((concluidos / total_chk) * 100) if total_chk > 0 else 0
         
-        # Define emoji do semáforo baseado na prioridade numérica para o Zap também
-        bloco_ico = "🔴" if d.prio_num <= 3 else ("🟡" if d.prio_num <= 6 else "🟢")
+        # SINALIZAÇÃO DE 4 CORES ATUALIZADA PRO ZAP
+        if d.prio_num <= 3:
+            bloco_ico = "🔴"
+        elif d.prio_num <= 6:
+            bloco_ico = "🟡"
+        elif d.prio_num <= 10:
+            bloco_ico = "🟢"
+        else:
+            bloco_ico = "🔵"
         
         texto_whats += f"{bloco_ico} *Posição [{d.prio_num}]* - {d.titulo}\n"
         texto_whats += f"└ *Setor:* {d.area} | *Venc:* {venc}\n"
@@ -461,7 +470,6 @@ def atualizar(id):
     demanda.status = request.form.get('status', demanda.status)
     demanda.descricao = request.form.get('descricao', demanda.descricao)
     
-    # Captura a nova prioridade na alteração de forma segura
     nova_prio = request.form.get('prioridade')
     if nova_prio:
         demanda.prioridade = str(nova_prio)
@@ -521,7 +529,7 @@ def gerar_pdf_ata(id):
             if linha_limpa:
                 texto_final = limpa_texto(f"{contador}. {linha_limpa}")
                 linhas_quebradas = textwrap.wrap(texto_final, width=65, break_long_words=True)
-                for pedaco in lines_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
+                for pedaco in linhas_quebradas: pdf.multi_cell(0, 8, pedaco, new_x="LMARGIN", new_y="NEXT")
                 contador += 1
         pdf_bytes = bytes(pdf.output())
         return send_file(io.BytesIO(pdf_bytes), as_attachment=True, download_name=f"Ata_{ata.data_criacao.strftime('%d-%m-%Y')}.pdf", mimetype='application/pdf')
